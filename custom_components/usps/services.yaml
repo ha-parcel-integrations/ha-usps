@@ -1,0 +1,23 @@
+track_parcel:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+    tracking_code:
+      required: true
+      example: "EXAMPLE123456"
+      selector:
+        text:
+
+untrack_parcel:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+    tracking_code:
+      required: true
+      example: "EXAMPLE123456"
+      selector:
+        text:

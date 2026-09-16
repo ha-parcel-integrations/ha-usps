@@ -1,0 +1,92 @@
+"""Informed Delivery inbox mapping tests."""
+from custom_components.usps.const import ParcelStatus
+from custom_components.usps.informed_delivery.parcels import (
+    map_informed_delivery_status,
+    normalize_informed_delivery_parcel,
+)
+
+
+def test_inbox_record_maps_to_eastern_delivery_window():
+    parcel = normalize_informed_delivery_parcel({"trackingNumber": "9400", "shipperName": "Sender", "eventTimestamp": "2026-01-02T12:00:00Z", "deliveryInfo": {"statusCategory": "Out for Delivery", "status": "Out for Delivery", "deliveryDate": "2026-01-02"}})
+    assert parcel["status"] is ParcelStatus.OUT_FOR_DELIVERY
+    assert parcel["planned_from"].endswith("-05:00")
+    assert parcel["history"] is None and parcel["receiver"] is None
+
+
+def test_inbox_preparing_for_delivery_is_in_transit():
+    parcel = normalize_informed_delivery_parcel({"trackingNumber": "9400", "deliveryInfo": {"statusCategory": "Preparing for Delivery"}})
+    assert parcel["status"] is ParcelStatus.IN_TRANSIT
+
+
+def test_inbox_raw_preserves_the_full_source_record():
+    raw = {"trackingNumber": "9400", "nickname": "Private package", "nested": {"packageId": "id"}, "deliveryInfo": {"statusCategory": "Delivered"}}
+    assert normalize_informed_delivery_parcel(raw)["raw"] is raw
+
+
+def test_delivered_at_is_interpreted_as_eastern_local_time():
+    parcel = normalize_informed_delivery_parcel(
+        {
+            "trackingNumber": "9400",
+            "eventTimestamp": "2026-08-14T10:29:00",
+            "deliveryInfo": {"statusCategory": "Delivered", "status": "Delivered, Front Door/Porch"},
+        }
+    )
+    assert parcel["delivered"] is True
+    assert parcel["delivered_at"] == "2026-08-14T10:29:00-04:00"
+    assert parcel["planned_from"] is None and parcel["planned_to"] is None
+
+
+def test_not_delivered_has_no_delivered_at():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "eventTimestamp": "2026-08-14T10:29:00", "deliveryInfo": {"statusCategory": "Out for Delivery"}}
+    )
+    assert parcel["delivered_at"] is None
+
+
+def test_missing_or_unparseable_event_timestamp_is_none():
+    assert normalize_informed_delivery_parcel({"trackingNumber": "9400", "deliveryInfo": {"statusCategory": "Delivered"}})["delivered_at"] is None
+    assert (
+        normalize_informed_delivery_parcel(
+            {"trackingNumber": "9400", "eventTimestamp": "not-a-timestamp", "deliveryInfo": {"statusCategory": "Delivered"}}
+        )["delivered_at"]
+        is None
+    )
+
+
+def test_status_falls_back_to_raw_status_when_category_absent():
+    parcel = normalize_informed_delivery_parcel({"trackingNumber": "9400", "deliveryInfo": {"status": "Delivered, Front Door/Porch"}})
+    assert parcel["status"] is ParcelStatus.DELIVERED
+    assert parcel["raw_status"] == "Delivered, Front Door/Porch"
+
+
+def test_missing_delivery_info_defaults_to_unknown():
+    parcel = normalize_informed_delivery_parcel({"trackingNumber": "9400"})
+    assert parcel["status"] is ParcelStatus.UNKNOWN
+
+
+def test_planned_to_uses_top_level_expected_delivery_date_fallback():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "expectedDeliveryDate": "2026-01-05", "deliveryInfo": {"statusCategory": "Preparing for Delivery"}}
+    )
+    assert parcel["planned_from"].startswith("2026-01-05")
+
+
+def test_unparseable_delivery_date_is_none():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "deliveryInfo": {"statusCategory": "Preparing for Delivery", "deliveryDate": "not-a-date"}}
+    )
+    assert parcel["planned_from"] is None
+
+
+def test_map_narrow_status_warns_once_and_never_reuses_api_tracking_prefixes(caplog):
+    # "Accepted" is a valid API Tracking prefix but not one of the three
+    # capture-backed Informed Delivery categories — it must stay unknown.
+    assert map_informed_delivery_status("Accepted") is ParcelStatus.UNKNOWN
+    assert caplog.text.count("Unrecognised USPS Informed Delivery status") == 1
+    caplog.clear()
+    assert map_informed_delivery_status("Accepted") is ParcelStatus.UNKNOWN
+    assert "Unrecognised" not in caplog.text
+
+
+def test_map_narrow_status_none_is_silent():
+    assert map_informed_delivery_status(None) is ParcelStatus.UNKNOWN

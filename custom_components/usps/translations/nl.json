@@ -1,0 +1,180 @@
+{
+  "title": "USPS",
+  "config": {
+    "step": {
+      "api_tracking": {
+        "title": "USPS API Tracking instellen",
+        "description": "Voer de Consumer Key en Consumer Secret in van je USPS-app met Tracking.",
+        "data": {"consumer_key": "Consumer Key", "consumer_secret": "Consumer Secret"}
+      },
+      "informed_delivery": {
+        "title": "USPS Informed Delivery instellen",
+        "description": "Meld je aan met het USPS-account dat is ingeschreven voor Informed Delivery. Opnieuw verifiëren kan MFA vereisen.",
+        "data": {"username": "USPS-gebruikersnaam of e-mail", "password": "Wachtwoord"}
+      },
+      "informed_delivery_challenge": {
+        "title": "Verifieer je USPS-aanmelding",
+        "description": "USPS heeft nog een stap nodig om het aanmelden af te ronden. USPS zegt:\n\n{prompt}",
+        "data": {"answer": "Antwoord"}
+      },
+      "user": {
+        "title": "USPS instellen",
+        "menu_options": {
+          "api_tracking": "API Tracking",
+          "informed_delivery": "Informed Delivery"
+        }
+      },
+      "reauth_confirm": {
+        "title": "USPS-gegevens geweigerd",
+        "description": "USPS accepteert de opgeslagen Consumer Key/Secret niet meer — mogelijk is deze vervangen of ingetrokken. Voer nieuwe gegevens in.",
+        "data": {
+          "consumer_key": "Consumer Key",
+          "consumer_secret": "Consumer Secret"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "USPS heeft deze gegevens geweigerd.",
+      "not_enrolled": "Geen adres op dit USPS-account is ingeschreven voor Informed Delivery.",
+      "tracking_not_enabled": "Deze gegevens hebben USPS Tracking niet ingeschakeld.",
+      "cannot_connect": "Kon USPS niet bereiken. Probeer het opnieuw.",
+      "too_many_challenges": "USPS heeft te veel verificatiestappen achter elkaar gevraagd. Probeer opnieuw aan te melden.",
+      "invalid_code": "USPS heeft die verificatiecode niet geaccepteerd. Meld je opnieuw aan om een nieuwe te ontvangen.",
+      "push_approval_timeout": "USPS wacht tot je deze aanmelding op je telefoon goedkeurt, maar dat duurde te lang. Probeer het opnieuw en keur de melding snel goed."
+    },
+    "abort": {
+      "already_configured": "USPS is al ingesteld.",
+      "reauth_successful": "USPS is opnieuw geverifieerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "USPS-opties",
+        "menu_options": {
+          "parcels": "Pakketten",
+          "settings": "Instellingen"
+        },
+        "sections": {
+          "parcels": {
+            "name": "Pakketten",
+            "data": {
+              "add": "Pakket toevoegen",
+              "remove": "Pakketten verwijderen"
+            },
+            "data_description": {
+              "add": "Voer een USPS-trackingcode in om het pakket te volgen. Je vindt de code op de verzendbevestiging of het niet-thuiskaartje."
+            }
+          },
+          "delivered": {
+            "name": "Bezorgde pakketten",
+            "data": {
+              "delivered_filter_type": "Filteren op",
+              "delivered_filter_amount": "Aantal"
+            },
+            "data_description": {
+              "delivered_filter_type": "Toon bezorgde pakketten van de laatste X dagen, of beperk tot de X meest recente.",
+              "delivered_filter_amount": "Aantal dagen of pakketten om te tonen."
+            }
+          },
+          "history": {
+            "name": "Pakketgeschiedenis",
+            "data": {
+              "include_history": "Statusgeschiedenis toevoegen"
+            },
+            "data_description": {
+              "include_history": "Voegt per pakket een geschiedenisattribuut toe met elke statusupdate (tijdstip, status, oorspronkelijke tekst). Standaard uit."
+            }
+          }
+        }
+      },
+      "parcels": {
+        "title": "Pakketten beheren",
+        "data": {
+          "tracking_codes": "Trackingcodes"
+        }
+      },
+      "settings": {
+        "title": "Instellingen",
+        "data": {
+          "delivered_filter_type": "Bezorgde pakketten: filteren op",
+          "delivered_filter_amount": "Bezorgde pakketten: aantal",
+          "include_history": "Statusgeschiedenis toevoegen"
+        }
+      }
+    },
+    "error": {
+      "invalid_tracking_code": "Dit lijkt geen USPS-trackingcode.",
+      "already_tracked": "Dit pakket wordt al gevolgd."
+    }
+  },
+  "selector": {
+    "delivered_filter_type": {
+      "options": {
+        "days": "Dagen",
+        "parcels": "Aantal pakketten"
+      }
+    }
+  },
+  "services": {
+    "track_parcel": {
+      "name": "Pakket volgen",
+      "description": "Begin met het volgen van een USPS-pakket via de trackingcode.",
+      "fields": {
+        "tracking_code": {
+          "name": "Trackingcode",
+          "description": "De USPS-trackingcode."
+        }
+      }
+    },
+    "untrack_parcel": {
+      "name": "Pakket niet meer volgen",
+      "description": "Stop met het volgen van een USPS-pakket via de trackingcode.",
+      "fields": {
+        "tracking_code": {
+          "name": "Trackingcode",
+          "description": "De USPS-trackingcode om niet meer te volgen."
+        }
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "parcel_registered": "Een pakket is geregistreerd",
+      "parcel_status_changed": "De status van een pakket is gewijzigd",
+      "parcel_delivered": "Een pakket is bezorgd",
+      "parcel_delivery_time_changed": "De verwachte bezorgtijd van een pakket is gewijzigd"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Verversen"
+      }
+    },
+    "calendar": {
+      "deliveries": {
+        "name": "Bezorgingen"
+      }
+    },
+    "sensor": {
+      "incoming_parcels": {
+        "name": "Inkomende pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "next_delivery": {
+        "name": "Volgende bezorging"
+      },
+      "delivered_parcels": {
+        "name": "Bezorgde pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "last_update": {
+        "name": "Laatste succesvolle update"
+      },
+      "parcel": {
+        "name": "Pakket {barcode}"
+      }
+    }
+  }
+}

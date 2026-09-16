@@ -1,0 +1,180 @@
+{
+  "title": "USPS",
+  "config": {
+    "step": {
+      "api_tracking": {
+        "title": "Set up USPS API Tracking",
+        "description": "Enter the Consumer Key and Consumer Secret for your USPS app with Tracking enabled.",
+        "data": {"consumer_key": "Consumer Key", "consumer_secret": "Consumer Secret"}
+      },
+      "informed_delivery": {
+        "title": "Set up USPS Informed Delivery",
+        "description": "Sign in with the USPS account enrolled in Informed Delivery. Reauthentication may require an MFA code.",
+        "data": {"username": "USPS username or email", "password": "Password"}
+      },
+      "informed_delivery_challenge": {
+        "title": "Verify your USPS sign-in",
+        "description": "USPS needs one more step to finish signing in. USPS says:\n\n{prompt}",
+        "data": {"answer": "Answer"}
+      },
+      "user": {
+        "title": "Set up USPS",
+        "menu_options": {
+          "api_tracking": "API Tracking",
+          "informed_delivery": "Informed Delivery"
+        }
+      },
+      "reauth_confirm": {
+        "title": "USPS credentials rejected",
+        "description": "USPS no longer accepts the stored Consumer Key/Secret — it may have been rotated or revoked. Enter a new one.",
+        "data": {
+          "consumer_key": "Consumer Key",
+          "consumer_secret": "Consumer Secret"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "USPS rejected these credentials.",
+      "not_enrolled": "No address on this USPS account is enrolled in Informed Delivery.",
+      "tracking_not_enabled": "These credentials do not have the USPS Tracking product enabled.",
+      "cannot_connect": "Could not reach USPS. Please try again.",
+      "too_many_challenges": "USPS asked for too many verification steps in a row. Please try signing in again.",
+      "invalid_code": "USPS did not accept that verification code. Sign in again to receive a new one.",
+      "push_approval_timeout": "USPS is waiting for you to approve this sign-in on your phone, but it timed out. Please try again and approve the prompt promptly."
+    },
+    "abort": {
+      "already_configured": "USPS is already set up.",
+      "reauth_successful": "USPS was reauthenticated successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "USPS options",
+        "menu_options": {
+          "parcels": "Parcels",
+          "settings": "Settings"
+        },
+        "sections": {
+          "parcels": {
+            "name": "Parcels",
+            "data": {
+              "add": "Add a parcel",
+              "remove": "Remove parcels"
+            },
+            "data_description": {
+              "add": "Enter an USPS tracking code to start tracking it. You find it on the shipping confirmation or the missed-delivery card."
+            }
+          },
+          "delivered": {
+            "name": "Delivered parcels",
+            "data": {
+              "delivered_filter_type": "Filter by",
+              "delivered_filter_amount": "Amount"
+            },
+            "data_description": {
+              "delivered_filter_type": "Show delivered parcels from the last X days, or limit to the X most recent.",
+              "delivered_filter_amount": "Number of days or parcels to show."
+            }
+          },
+          "history": {
+            "name": "Parcel history",
+            "data": {
+              "include_history": "Include status history"
+            },
+            "data_description": {
+              "include_history": "Add a per-parcel history attribute listing each status update (timestamp, status, original text). Off by default."
+            }
+          }
+        }
+      },
+      "parcels": {
+        "title": "Manage parcels",
+        "data": {
+          "tracking_codes": "Tracking codes"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "delivered_filter_type": "Delivered parcels: filter by",
+          "delivered_filter_amount": "Delivered parcels: amount",
+          "include_history": "Include status history"
+        }
+      }
+    },
+    "error": {
+      "invalid_tracking_code": "That does not look like an USPS tracking code.",
+      "already_tracked": "That parcel is already being tracked."
+    }
+  },
+  "selector": {
+    "delivered_filter_type": {
+      "options": {
+        "days": "Days",
+        "parcels": "Number of parcels"
+      }
+    }
+  },
+  "services": {
+    "track_parcel": {
+      "name": "Track parcel",
+      "description": "Start tracking a parcel by its USPS tracking code.",
+      "fields": {
+        "tracking_code": {
+          "name": "Tracking code",
+          "description": "The USPS tracking code."
+        }
+      }
+    },
+    "untrack_parcel": {
+      "name": "Untrack parcel",
+      "description": "Stop tracking a parcel by its USPS tracking code.",
+      "fields": {
+        "tracking_code": {
+          "name": "Tracking code",
+          "description": "The USPS tracking code to stop tracking."
+        }
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "parcel_registered": "A parcel was registered",
+      "parcel_status_changed": "A parcel's status changed",
+      "parcel_delivered": "A parcel was delivered",
+      "parcel_delivery_time_changed": "A parcel's expected delivery time changed"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "calendar": {
+      "deliveries": {
+        "name": "Deliveries"
+      }
+    },
+    "sensor": {
+      "incoming_parcels": {
+        "name": "Incoming parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "next_delivery": {
+        "name": "Next delivery"
+      },
+      "delivered_parcels": {
+        "name": "Delivered parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "last_update": {
+        "name": "Last successful update"
+      },
+      "parcel": {
+        "name": "Parcel {barcode}"
+      }
+    }
+  }
+}
