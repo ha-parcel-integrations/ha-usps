@@ -9,7 +9,7 @@ Ready-to-paste Home Assistant snippets for the USPS integration.
 
 All examples assume a single USPS hub. Adjust entity IDs to match yours.
 
-**Feeding USPS from e-mail:** USPS is code-based — every parcel must be registered by its tracking code before it can be tracked. [`automations/track_parcels_from_email.yaml`](automations/track_parcels_from_email.yaml) extracts tracking codes from incoming shipping mails (core IMAP integration + regex, with an optional AI fallback) and registers them automatically; setup guide and pitfalls in [`automations/track_parcels_from_email.md`](automations/track_parcels_from_email.md).
+**Feeding USPS from e-mail** (API Tracking only; Informed Delivery discovers packages itself): API Tracking is code-based — every parcel must be registered by its tracking code before it can be tracked. [`automations/track_parcels_from_email.yaml`](automations/track_parcels_from_email.yaml) extracts tracking codes from incoming shipping mails (core IMAP integration + regex, with an optional AI fallback) and registers them automatically; setup guide and pitfalls in [`automations/track_parcels_from_email.md`](automations/track_parcels_from_email.md).
 
 ## Services
 

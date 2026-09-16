@@ -56,6 +56,25 @@ and never accepts manual parcel mutation. Its five-minute access token and
 fifteen-minute rotating refresh chain require a ten-minute runtime cadence;
 after a sufficiently long Home Assistant outage it must reauthenticate.
 
+Informed Delivery sign-in tripwires, each found against a real account:
+- **Own connector.** `informed_delivery/session.py` builds its own IPv4
+  `TCPConnector`. Any HA session helper (also `async_create_clientsession`)
+  shares HA's pooled connector, and USPS's edge then answers the credentials
+  round with HTTP 503.
+- **`NameCallback` is only the username in the round that also has a
+  `PasswordCallback`.** Elsewhere it is the emailed passcode field.
+- **"Answered" is tracked by callback identity**, never by a non-empty input:
+  USPS pre-fills defaults (a `ConfirmationCallback`'s default button).
+- **`TextOutputCallback` with `messageType` 4 is page JavaScript**, never shown
+  as a prompt. The real question is a sibling message or the input's `prompt`.
+- **A "try again?" `ConfirmationCallback` is a rejection** (bad password or
+  passcode, HTTP 200), not a question to render.
+- `ChoiceCallback` choices are the output named `choices`,
+  `ConfirmationCallback`'s the one named `options`; `waitTime` is a string.
+
+Scanned letter mail is not implemented; the integration covers packages only.
+Outgoing parcels are not supported yet either.
+
 Both sources deliberately return `None` for weight, dimensions and pickup
 point data. API Tracking alone can expose structured history; Informed Delivery
 alone can expose a delivery window. Diagnostics redact all credentials, tokens,

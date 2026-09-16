@@ -7,9 +7,14 @@
 
 > 💬 Questions or feedback? Join the discussion on the [Home Assistant community](https://community.home-assistant.io/t/packages-postnl-dhl-nl-dpd-and-gls-parcel-integration/112433/).
 
-A custom Home Assistant integration for two separate USPS sources: household
-**Informed Delivery** package discovery and explicit-code **API Tracking** via a
-USPS Business Account. Each entry uses one source; both may coexist.
+A custom Home Assistant integration for two separate USPS sources:
+
+- **Informed Delivery** discovers incoming packages for the addresses enrolled on your USPS account. No tracking numbers to type.
+- **API Tracking** follows tracking numbers you enter, through USPS's official Tracking API with your own developer app.
+
+Each config entry uses one source; you can add both.
+
+> **Pre-release.** Signing in to Informed Delivery is confirmed against a real account, but neither source has seen real package data yet. Statuses may be incomplete. Can you help test? See [#1 (Informed Delivery)](https://github.com/ha-parcel-integrations/ha-usps/issues/1) and [#2 (API Tracking)](https://github.com/ha-parcel-integrations/ha-usps/issues/2).
 
 Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) family: it publishes the same canonical parcel format, statuses and events as the other carrier integrations, so it plugs straight into the [Parcel Aggregator](https://github.com/ha-parcel-integrations/ha-parcel-aggregator) and cross-carrier automations.
 
@@ -35,12 +40,12 @@ Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) 
 
 ## Features
 
-- Informed Delivery automatically discovers packages for enrolled household addresses
-- API Tracking follows explicitly registered tracking codes with event history
-- Per-parcel sensor with the canonical status (`registered` / `in_transit` / `out_for_delivery` / `delivered` / …), the carrier's own status text, the expected delivery window and a tracking deep-link
+- Informed Delivery automatically discovers packages for enrolled addresses, including their expected delivery day
+- API Tracking follows the tracking codes you add, with optional event history
+- Per-parcel sensor with the canonical status (`registered` / `in_transit` / `out_for_delivery` / `delivered` / …), the carrier's own status text and a tracking deep-link
 - Summary sensors: incoming parcels, next delivery, recently delivered parcels
-- Read-only **Deliveries** calendar with the expected delivery windows
-- `usps.track_parcel` / `usps.untrack_parcel` services, so a dashboard button can add a parcel
+- Read-only **Deliveries** calendar with the expected delivery days
+- `usps.track_parcel` / `usps.untrack_parcel` services (API Tracking), so a dashboard button can add a parcel
 - Events + device triggers for no-code automations (parcel registered, status changed, delivered, delivery time changed)
 - Opt-in per-parcel status history
 - Manual refresh button and a diagnostic last-update sensor
@@ -48,8 +53,10 @@ Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) 
 ## Requirements
 
 - Home Assistant 2024.12 or newer
-- Informed Delivery: a USPS account enrolled at `informeddelivery.usps.com`
-- API Tracking: a USPS Business Account app with Tracking enabled and its Consumer Key/Secret
+- Informed Delivery: a USPS account with at least one address enrolled at [informeddelivery.usps.com](https://informeddelivery.usps.com)
+- API Tracking: an app on the [USPS developer portal](https://developers.usps.com) with the Tracking API added, and its Consumer Key and Consumer Secret
+
+Scanned letter mail from Informed Delivery is not supported (yet); this integration covers packages only.
 
 ## Installation
 
@@ -57,7 +64,7 @@ Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) 
 
 1. In HACS, choose the three-dot menu → **Custom repositories**.
 2. Add `https://github.com/ha-parcel-integrations/ha-usps` as an **Integration**.
-3. Install **USPS** and restart Home Assistant.
+3. Install **USPS** and restart Home Assistant. Until the first release, pick the `main` version.
 
 ### Manual
 
@@ -65,11 +72,25 @@ Copy `custom_components/usps` into your `config/custom_components/` folder and r
 
 ## Configuration
 
-Add the integration via **Settings → Devices & Services → Add Integration → USPS**, then select Informed Delivery or API Tracking.
+Add the integration via **Settings → Devices & Services → Add Integration → USPS**, then choose a source.
 
-Informed Delivery's rotating refresh chain expires after a short offline period. If Home Assistant is offline too long, reauthentication requires your password and any MFA step again.
+### Informed Delivery
 
-Then add parcels via the integration's **Configure** dialog, the [`usps.track_parcel`](#services) service, or a [dashboard button](examples/dashboards/add_parcel_card.yaml). The tracking code is on your shipping confirmation email or the missed-delivery card.
+1. Enter your USPS username (or email) and password.
+2. USPS usually asks for a verification step: choose how to receive a passcode (for example by email), then enter the passcode. The form shows USPS's own text for each step.
+3. The entry is created once USPS confirms at least one address enrolled in Informed Delivery.
+
+Your password is not stored; only the session USPS hands back is kept, and it is renewed automatically while Home Assistant runs. After Home Assistant has been offline for a while that session expires, and Home Assistant asks you to sign in again (including the passcode).
+
+Packages appear by themselves; there is nothing to add.
+
+### API Tracking
+
+1. Create an app on the [USPS developer portal](https://developers.usps.com) and add the **Tracking** API to it.
+2. Enter the app's **Consumer Key** and **Consumer Secret**. They are checked against USPS right away.
+3. Add parcels via the integration's **Configure** dialog, the [`usps.track_parcel`](#services) service, or a [dashboard button](examples/dashboards/add_parcel_card.yaml). The tracking code is on your shipping confirmation email or the missed-delivery card.
+
+If USPS stops accepting the key (for example after you rotate it), Home Assistant asks for new credentials.
 
 ## Options
 
@@ -77,9 +98,9 @@ Open **Configure** on the integration entry:
 
 | Section | Option | Default | Description |
 |---|---|---|---|
-| Parcels | Add / remove | — | Manage the tracked tracking codes. Changes apply immediately, no restart. |
-| Delivered parcels | Filter by / amount | last 7 days | How long delivered parcels stay visible on the delivered sensor. |
-| Parcel history | Include status history | off | Adds a `history` attribute per parcel with each status update. |
+| Parcels (API Tracking only) | Add / remove | — | Manage the tracked tracking codes. Changes apply immediately, no restart. |
+| Settings | Delivered parcels: filter by / amount | last 7 days | How long delivered parcels stay visible on the delivered sensor. |
+| Settings | Include status history | off | Adds a `history` attribute per parcel with each status update. Only API Tracking reports history. |
 
 Polling isn't one of these settings: the integration polls on a dynamic,
 status-driven schedule (quiet overnight window, faster when a parcel is out
@@ -152,16 +173,27 @@ Third-party cards that work with this integration's sensors:
 
 ## Debugging
 
+To log sign-in as well, enable debug logging before adding the integration, in `configuration.yaml`:
+
 ```yaml
 logger:
   logs:
     custom_components.usps: debug
 ```
 
+For an existing entry you can also use **Settings → Devices & Services → USPS → ⋮ → Enable debug logging**; disabling it again downloads the log.
+
+The log never contains passwords, keys or tokens, and addresses are only logged as a short hash. It does contain USPS's own sign-in text, which can include your masked email address, so check it before posting. **⋮ → Download diagnostics** gives a redacted snapshot.
+
 ## Troubleshooting
 
 - **A parcel shows `unknown`** — USPS has not scanned it yet (their API answers `not_found` until the first scan), or the code is wrong. It will pick up automatically once scanned.
-- **A status logs "Unrecognised USPS status"** — please [open an issue](https://github.com/ha-parcel-integrations/ha-usps/issues/new) with the logged line so the mapping can be extended.
+- **A status logs "Unrecognised USPS status"** — please [open an issue](https://github.com/ha-parcel-integrations/ha-usps/issues/new?template=unrecognised_status.yml) with the logged line so the mapping can be extended.
+- **"No address on this USPS account is enrolled in Informed Delivery"** — sign-in worked, but the account has no enrolled address. Enroll one at [informeddelivery.usps.com](https://informeddelivery.usps.com) first.
+- **"USPS did not accept that verification code"** — the passcode was wrong or expired. Sign in again to receive a new one.
+- **Informed Delivery asks to sign in again** — the session expired, usually after Home Assistant was offline for a while. This cannot be renewed without you, because USPS asks for a passcode.
+- **"These credentials do not have the USPS Tracking product enabled"** — add the Tracking API to your app on the USPS developer portal.
+- **"Could not reach USPS"** — a network problem or a temporary USPS outage. Try again later; if it keeps happening, attach a debug log to an issue.
 
 ## Related integrations
 
