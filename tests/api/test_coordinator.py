@@ -5,8 +5,8 @@ import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.usps.api_tracking.client import USPSApiError
-from custom_components.usps.api_tracking.coordinator import (
+from custom_components.usps.api.client import USPSApiError
+from custom_components.usps.api.coordinator import (
     BACKOFF_BASE_SECONDS,
     USPSCoordinator,
 )
@@ -47,7 +47,7 @@ async def test_delivery_transition_fires_only_delivered_event(hass):
     client = MagicMock()
     client.async_get_parcel = AsyncMock()
     coordinator = USPSCoordinator(hass, client, entry)
-    from custom_components.usps.api_tracking.parcels import (
+    from custom_components.usps.api.parcels import (
         normalize_api_tracking_parcel,
     )
     from custom_components.usps.const import ParcelStatus

@@ -1,9 +1,9 @@
 """Informed Delivery inbox mapping tests."""
-from custom_components.usps.const import ParcelStatus
-from custom_components.usps.informed_delivery.parcels import (
+from custom_components.usps.account.parcels import (
     map_informed_delivery_status,
     normalize_informed_delivery_parcel,
 )
+from custom_components.usps.const import ParcelStatus
 
 
 def test_inbox_record_maps_to_eastern_delivery_window():

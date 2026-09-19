@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 import aiohttp
 
-from ..api_tracking.client import USPSApiError, USPSAuthError
+from ..api.client import USPSApiError, USPSAuthError
 
 _LOGGER = logging.getLogger(__name__)
 

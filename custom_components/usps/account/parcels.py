@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, time
 from typing import Any
 
-from ..api_tracking.parcels import NEW_ISSUE_URL, tracking_url
+from ..api.parcels import NEW_ISSUE_URL, tracking_url
 from ..const import ParcelStatus
 from .client import EASTERN
 

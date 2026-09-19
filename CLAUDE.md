@@ -44,11 +44,10 @@ you act in one of these areas:
 
 ## Carrier-specific notes
 
-Each config entry is immutable to one source: `api_tracking` or
-`informed_delivery`. Multiple entries are supported, including one of each
-source. API Tracking stores the user-owned Consumer Key/Secret and caches only
-its access token in memory. It follows user-entered codes and therefore owns
-the parcel editor and global services.
+Each config entry is immutable to one source: API or account. Multiple entries
+are supported, including one of each source. API stores the user-owned Consumer
+Key/Secret and caches only its access token in memory. It follows user-entered
+codes and therefore owns the parcel editor and global services.
 
 Informed Delivery stores no password. It stores the rotating refresh token and
 the current access token, discovers packages only from RMIN-enrolled addresses,
@@ -57,7 +56,7 @@ fifteen-minute rotating refresh chain require a ten-minute runtime cadence;
 after a sufficiently long Home Assistant outage it must reauthenticate.
 
 Informed Delivery sign-in tripwires, each found against a real account:
-- **Own connector.** `informed_delivery/session.py` builds its own IPv4
+- **Own connector.** `account/session.py` builds its own IPv4
   `TCPConnector`. Any HA session helper (also `async_create_clientsession`)
   shares HA's pooled connector, and USPS's edge then answers the credentials
   round with HTTP 503.
@@ -218,7 +217,8 @@ repo's own `CLAUDE.md` — not a generator flag.
 
 | File | Carrier-specific? |
 |---|---|
-| `api.py` (HTTP client, error types) | **yes** |
+| `api/` (credentialed API client, coordinator, normalizer and error types) | **yes** |
+| `account/` (account auth, client, coordinator and normalizer) | **yes** |
 | `const.py` (domain, URLs, `ParcelStatus`, option keys) | partly (URLs) |
 | `parcels.py` (status map, `normalize_parcel`, history, sort, filters — pure, no I/O) | partly (`_STATUS_MAP`, `normalize_parcel`) |
 | `coordinator.py` (fetch, cache, event firing) | mostly not |

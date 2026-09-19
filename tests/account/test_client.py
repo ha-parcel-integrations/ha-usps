@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.usps.api_tracking.client import USPSApiError, USPSAuthError
-from custom_components.usps.informed_delivery.client import (
+from custom_components.usps.account.client import (
     InformedDeliveryClient,
     InformedDeliveryTokenExpired,
 )
-from custom_components.usps.informed_delivery.coordinator import (
+from custom_components.usps.account.coordinator import (
     InformedDeliveryCoordinator,
 )
+from custom_components.usps.api.client import USPSApiError, USPSAuthError
 
 
 async def test_refresh_replaces_both_rotating_tokens():
@@ -44,7 +44,7 @@ async def test_401_with_unrecognised_code_is_a_revoked_session():
 
 
 async def test_401_with_unparseable_body_is_treated_as_expired():
-    from custom_components.usps.informed_delivery.client import (
+    from custom_components.usps.account.client import (
         InformedDeliveryTokenExpired,
     )
 
@@ -135,7 +135,7 @@ async def test_keepalive_starts_reauth_after_dead_refresh(hass):
     client.async_refresh = AsyncMock(side_effect=USPSAuthError("dead"))
     coordinator = InformedDeliveryCoordinator(hass, client, entry)
     captured = {}
-    with patch("custom_components.usps.informed_delivery.coordinator.async_track_time_interval", side_effect=lambda _hass, callback, _interval: captured.setdefault("callback", callback) or MagicMock()):
+    with patch("custom_components.usps.account.coordinator.async_track_time_interval", side_effect=lambda _hass, callback, _interval: captured.setdefault("callback", callback) or MagicMock()):
         coordinator.async_start_keepalive()
     with patch.object(hass.config_entries.flow, "async_init", new=AsyncMock(return_value={})) as init:
         await captured["callback"](None)
@@ -165,7 +165,7 @@ async def test_keepalive_success_persists_the_rotated_refresh_token(hass):
     client.refresh_token = "new-refresh"
     coordinator = InformedDeliveryCoordinator(hass, client, entry)
     captured = {}
-    with patch("custom_components.usps.informed_delivery.coordinator.async_track_time_interval", side_effect=lambda _hass, callback, _interval: captured.setdefault("callback", callback) or MagicMock()):
+    with patch("custom_components.usps.account.coordinator.async_track_time_interval", side_effect=lambda _hass, callback, _interval: captured.setdefault("callback", callback) or MagicMock()):
         coordinator.async_start_keepalive()
     with patch.object(hass.config_entries, "async_update_entry") as update_entry:
         await captured["callback"](None)
@@ -231,6 +231,6 @@ def test_keepalive_registers_a_ten_minute_unload_callback(hass):
     entry = MagicMock(entry_id="entry", data={})
     coordinator = InformedDeliveryCoordinator(hass, client, entry)
     cancel = MagicMock()
-    with patch("custom_components.usps.informed_delivery.coordinator.async_track_time_interval", return_value=cancel) as tracker:
+    with patch("custom_components.usps.account.coordinator.async_track_time_interval", return_value=cancel) as tracker:
         assert coordinator.async_start_keepalive() is cancel
     assert tracker.call_args.args[2].total_seconds() == 600

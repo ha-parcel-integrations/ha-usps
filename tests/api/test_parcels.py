@@ -1,7 +1,7 @@
 """API Tracking canonical mapping tests."""
 from unittest.mock import MagicMock
 
-from custom_components.usps.api_tracking.parcels import (
+from custom_components.usps.api.parcels import (
     apply_delivered_filter,
     build_history,
     format_dimensions,

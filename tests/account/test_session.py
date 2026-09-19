@@ -3,7 +3,7 @@ import socket
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from custom_components.usps.informed_delivery.session import (
+from custom_components.usps.account.session import (
     async_new_informed_delivery_session,
 )
 

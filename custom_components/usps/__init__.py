@@ -8,8 +8,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api_tracking.client import ApiTrackingClient
-from .api_tracking.coordinator import USPSCoordinator
+from .account.client import InformedDeliveryClient
+from .account.coordinator import InformedDeliveryCoordinator
+from .account.session import async_new_informed_delivery_session
+from .api.client import ApiTrackingClient
+from .api.coordinator import USPSCoordinator
 from .const import (
     CONF_CONSUMER_KEY,
     CONF_CONSUMER_SECRET,
@@ -19,9 +22,6 @@ from .const import (
     SOURCE_API_TRACKING,
     SOURCE_INFORMED_DELIVERY,
 )
-from .informed_delivery.client import InformedDeliveryClient
-from .informed_delivery.coordinator import InformedDeliveryCoordinator
-from .informed_delivery.session import async_new_informed_delivery_session
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)

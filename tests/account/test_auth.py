@@ -3,8 +3,7 @@ import json
 
 import pytest
 
-from custom_components.usps.api_tracking.client import USPSAuthError
-from custom_components.usps.informed_delivery.auth import (
+from custom_components.usps.account.auth import (
     JourneyChallenge,
     JourneyRejected,
     answer_challenge,
@@ -14,6 +13,7 @@ from custom_components.usps.informed_delivery.auth import (
     pkce_pair,
     rejection_message,
 )
+from custom_components.usps.api.client import USPSAuthError
 
 
 def test_pkce_pair_and_rmin_filter():

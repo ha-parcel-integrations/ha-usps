@@ -25,7 +25,7 @@ async def test_api_tracking_reauth_updates_only_api_credentials(hass):
 
 
 async def test_reauth_confirm_surfaces_invalid_auth(hass):
-    from custom_components.usps.api_tracking.client import USPSAuthError
+    from custom_components.usps.api.client import USPSAuthError
 
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SOURCE: SOURCE_API_TRACKING, CONF_CONSUMER_KEY: "old", CONF_CONSUMER_SECRET: "old-secret"})
     entry.add_to_hass(hass)
@@ -36,7 +36,7 @@ async def test_reauth_confirm_surfaces_invalid_auth(hass):
 
 
 async def test_reauth_confirm_surfaces_cannot_connect(hass):
-    from custom_components.usps.api_tracking.client import USPSApiError
+    from custom_components.usps.api.client import USPSApiError
 
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SOURCE: SOURCE_API_TRACKING, CONF_CONSUMER_KEY: "old", CONF_CONSUMER_SECRET: "old-secret"})
     entry.add_to_hass(hass)
@@ -60,7 +60,7 @@ async def test_api_tracking_setup_creates_entry(hass):
 async def test_api_tracking_setup_surfaces_tracking_not_enabled(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import TrackingNotEnabledError
+    from custom_components.usps.api.client import TrackingNotEnabledError
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": SOURCE_API_TRACKING})
@@ -72,7 +72,7 @@ async def test_api_tracking_setup_surfaces_tracking_not_enabled(hass):
 async def test_api_tracking_setup_surfaces_invalid_auth(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSAuthError
+    from custom_components.usps.api.client import USPSAuthError
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": SOURCE_API_TRACKING})
@@ -84,7 +84,7 @@ async def test_api_tracking_setup_surfaces_invalid_auth(hass):
 async def test_api_tracking_setup_surfaces_cannot_connect(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSApiError
+    from custom_components.usps.api.client import USPSApiError
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": SOURCE_API_TRACKING})

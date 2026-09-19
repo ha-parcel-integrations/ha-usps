@@ -3,8 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.usps.api_tracking.client import USPSApiError, USPSAuthError
-from custom_components.usps.informed_delivery.auth import (
+from custom_components.usps.account.auth import (
     MAX_AUTO_ADVANCE,
     MAX_CHALLENGES,
     JourneyChallenge,
@@ -13,6 +12,7 @@ from custom_components.usps.informed_delivery.auth import (
     complete_login,
     exchange_refresh_token,
 )
+from custom_components.usps.api.client import USPSApiError, USPSAuthError
 
 
 def _ctx(response):
@@ -182,7 +182,7 @@ async def test_complete_login_happy_path_with_no_challenge():
 async def test_complete_login_raises_when_journey_start_yields_no_token(monkeypatch):
     fake_journey = MagicMock()
     fake_journey.start = AsyncMock(return_value="")
-    with patch("custom_components.usps.informed_delivery.auth.LoginJourney", return_value=fake_journey):
+    with patch("custom_components.usps.account.auth.LoginJourney", return_value=fake_journey):
         with pytest.raises(USPSAuthError, match="did not complete"):
             await complete_login(MagicMock(), "user@example.test", "secret")
 
@@ -195,7 +195,7 @@ async def test_push_approval_polls_and_then_completes():
     approved = _response(json={"tokenId": "tok"})
     session.post.side_effect = [_ctx(pending), _ctx(pending), _ctx(approved)]
     journey = LoginJourney(session)
-    with patch("custom_components.usps.informed_delivery.auth.asyncio.sleep", new=AsyncMock()) as sleep:
+    with patch("custom_components.usps.account.auth.asyncio.sleep", new=AsyncMock()) as sleep:
         token_id = await journey.start("user@example.test", "secret")
     assert token_id == "tok"
     assert sleep.call_count == 2
@@ -213,7 +213,7 @@ async def test_string_zero_wait_time_auto_advances_without_polling():
     round1 = _response(json={"tokenId": "tok"})
     session.post.side_effect = [_ctx(round0), _ctx(round1)]
     journey = LoginJourney(session)
-    with patch("custom_components.usps.informed_delivery.auth.asyncio.sleep", new=AsyncMock()) as sleep:
+    with patch("custom_components.usps.account.auth.asyncio.sleep", new=AsyncMock()) as sleep:
         token_id = await journey.start("user@example.test", "secret")
     assert token_id == "tok"
     sleep.assert_not_called()
@@ -225,7 +225,7 @@ async def test_push_approval_times_out_after_the_bound():
     pending = _response(json={"authId": "a1", "callbacks": [{"type": "PollingWaitCallback", "output": [{"name": "waitTime", "value": 5000}]}]})
     session.post.return_value = _ctx(pending)
     journey = LoginJourney(session)
-    with patch("custom_components.usps.informed_delivery.auth.asyncio.sleep", new=AsyncMock()):
+    with patch("custom_components.usps.account.auth.asyncio.sleep", new=AsyncMock()):
         with pytest.raises(USPSAuthError, match="not approved in time"):
             await journey.start("user@example.test", "secret")
 

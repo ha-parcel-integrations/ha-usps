@@ -19,10 +19,10 @@ def reset_one_shot_warnings():
     test's one-shot-warning assertion would depend on which test already
     triggered that status code first.
     """
-    from custom_components.usps.api_tracking import parcels as api_tracking_parcels
-    from custom_components.usps.informed_delivery import (
+    from custom_components.usps.account import (
         parcels as informed_delivery_parcels,
     )
+    from custom_components.usps.api import parcels as api_tracking_parcels
 
     api_tracking_parcels._unmapped_statuses_logged.clear()
     informed_delivery_parcels._unmapped_statuses_logged.clear()

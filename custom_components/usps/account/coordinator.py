@@ -13,7 +13,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from ..api_tracking.client import USPSApiError, USPSAuthError
+from ..api.client import USPSApiError, USPSAuthError
 from ..const import DOMAIN
 from .client import InformedDeliveryClient, InformedDeliveryTokenExpired
 from .parcels import normalize_informed_delivery_parcel

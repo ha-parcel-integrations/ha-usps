@@ -20,7 +20,16 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import (
+from .account.auth import (
+    JourneyChallenge,
+    JourneyRejected,
+    LoginJourney,
+    callback_choices,
+    enrolled_addresses,
+    granted_services,
+)
+from .account.session import async_new_informed_delivery_session
+from .api.client import (
     ApiTrackingClient,
     TrackingNotEnabledError,
     USPSApiError,
@@ -44,15 +53,6 @@ from .const import (
     SOURCE_API_TRACKING,
     SOURCE_INFORMED_DELIVERY,
 )
-from .informed_delivery.auth import (
-    JourneyChallenge,
-    JourneyRejected,
-    LoginJourney,
-    callback_choices,
-    enrolled_addresses,
-    granted_services,
-)
-from .informed_delivery.session import async_new_informed_delivery_session
 
 _LOGGER = logging.getLogger(__name__)
 

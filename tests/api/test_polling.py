@@ -11,8 +11,8 @@ import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.usps.api_tracking.client import USPSApiError
-from custom_components.usps.api_tracking.coordinator import (
+from custom_components.usps.api.client import USPSApiError
+from custom_components.usps.api.coordinator import (
     USPSCoordinator,
     _hottest_tier_minutes,
     _in_quiet_window,

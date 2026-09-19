@@ -1,15 +1,15 @@
 """Informed Delivery config-flow tests."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from custom_components.usps.account.auth import (
+    JourneyChallenge,
+    JourneyRejected,
+    enrolled_addresses,
+)
 from custom_components.usps.const import (
     CONF_REFRESH_TOKEN,
     CONF_SOURCE,
     SOURCE_INFORMED_DELIVERY,
-)
-from custom_components.usps.informed_delivery.auth import (
-    JourneyChallenge,
-    JourneyRejected,
-    enrolled_addresses,
 )
 
 
@@ -142,7 +142,7 @@ async def test_repeated_challenge_re_shows_the_form(hass):
 async def test_too_many_challenges_surfaces_a_dedicated_error(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSAuthError
+    from custom_components.usps.api.client import USPSAuthError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -207,7 +207,7 @@ async def test_rejected_password_is_invalid_auth(hass):
 async def test_informed_delivery_start_surfaces_invalid_auth(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSAuthError
+    from custom_components.usps.api.client import USPSAuthError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -222,7 +222,7 @@ async def test_informed_delivery_start_surfaces_invalid_auth(hass):
 async def test_informed_delivery_start_surfaces_cannot_connect(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSApiError
+    from custom_components.usps.api.client import USPSApiError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -237,7 +237,7 @@ async def test_informed_delivery_start_surfaces_cannot_connect(hass):
 async def test_informed_delivery_finish_surfaces_invalid_auth(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSAuthError
+    from custom_components.usps.api.client import USPSAuthError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -252,7 +252,7 @@ async def test_informed_delivery_finish_surfaces_invalid_auth(hass):
 async def test_informed_delivery_finish_surfaces_cannot_connect(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSApiError
+    from custom_components.usps.api.client import USPSApiError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -282,7 +282,7 @@ async def test_boolean_challenge_is_rendered_as_a_boolean_selector(hass):
 async def test_challenge_answer_surfaces_cannot_connect(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSApiError
+    from custom_components.usps.api.client import USPSApiError
     from custom_components.usps.const import DOMAIN
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -299,7 +299,7 @@ async def test_challenge_answer_surfaces_cannot_connect(hass):
 async def test_challenge_finish_surfaces_invalid_auth_and_cannot_connect(hass):
     from homeassistant.config_entries import SOURCE_USER
 
-    from custom_components.usps.api_tracking.client import USPSApiError, USPSAuthError
+    from custom_components.usps.api.client import USPSApiError, USPSAuthError
     from custom_components.usps.const import DOMAIN
 
     callback = {"type": "OneTimePasswordCallback", "input": [{"value": ""}]}

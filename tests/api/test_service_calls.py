@@ -20,7 +20,7 @@ from custom_components.usps.const import (
 async def _setup_api(hass):
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SOURCE: SOURCE_API_TRACKING, CONF_CONSUMER_KEY: "key", CONF_CONSUMER_SECRET: "secret"}, options={CONF_PARCELS: []})
     entry.add_to_hass(hass)
-    with patch("custom_components.usps.api_tracking.client.ApiTrackingClient.async_get_parcel", new=AsyncMock(return_value=None)):
+    with patch("custom_components.usps.api.client.ApiTrackingClient.async_get_parcel", new=AsyncMock(return_value=None)):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry

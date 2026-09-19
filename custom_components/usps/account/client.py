@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 
-from ..api_tracking.client import USPSApiError, USPSAuthError
+from ..api.client import USPSApiError, USPSAuthError
 from ..const import INFORMED_DELIVERY_API_URL
 from .auth import exchange_refresh_token
 

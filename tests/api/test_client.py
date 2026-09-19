@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.usps.api_tracking.client import (
+from custom_components.usps.api.client import (
     ApiTrackingClient,
     TrackingNotEnabledError,
     USPSApiError,
