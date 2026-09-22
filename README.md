@@ -103,9 +103,31 @@ Open **Configure** on the integration entry:
 | Settings | Include status history | off | Adds a `history` attribute per parcel with each status update. Only API Tracking reports history. |
 
 Polling isn't one of these settings: the integration polls on a dynamic,
-status-driven schedule (quiet overnight window, faster when a parcel is out
-for delivery, stopped entirely once nothing is left to track) with nothing to
-configure. See [CLAUDE.md](CLAUDE.md) for the details.
+status-driven schedule with nothing to configure.
+
+## Dynamic polling
+
+Polling isn't a setting here — the integration adjusts its own cadence to
+what your tracked parcels are actually doing. The two sources behave a bit
+differently, since only Informed Delivery can ever report a delivery window
+and only API Tracking entries can run out of parcels to track:
+
+- **Quiet hours** — no polling between 00:00–06:00 local time, aside from one
+  catch-up check at each end of that window (around midnight and around 6
+  AM), so an overnight update is never missed.
+- **Hot (every 15 minutes)** — while any tracked parcel is out for delivery
+  today, starting an hour before its delivery window opens (or immediately if
+  no window is known yet — this is the fallback that always fires for an API
+  Tracking entry, since that source never reports a delivery window at all).
+- **Normal (every 45 minutes)** — for anything else still on its way.
+- **Fully paused, API Tracking only** — once every tracked parcel has been
+  delivered, or nothing is tracked at all, an API Tracking entry stops
+  polling until you add a parcel back (adding one always triggers an
+  immediate check, regardless of the pause). An Informed Delivery entry never
+  fully stops: with nothing hot or in transit it keeps polling at the normal
+  cadence, since that's also how a newly discovered package shows up.
+- A small, fixed per-hub offset is added on top, so not every USPS hub out
+  there polls at exactly the same second.
 
 ## Removal
 
