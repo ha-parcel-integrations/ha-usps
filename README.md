@@ -14,7 +14,7 @@ A custom Home Assistant integration for two separate USPS sources:
 
 Each config entry uses one source; you can add both.
 
-> **Pre-release.** Informed Delivery is confirmed against a real account with packages, but API Tracking has not seen real package data yet. Statuses may be incomplete. Can you help test? See [#1 (Informed Delivery)](https://github.com/ha-parcel-integrations/ha-usps/issues/1) and [#2 (API Tracking)](https://github.com/ha-parcel-integrations/ha-usps/issues/2).
+> **Help wanted: API Tracking.** Informed Delivery is confirmed against real accounts with packages. API Tracking has not seen real package data yet, so its statuses may be incomplete. Have your own USPS developer app? See [#2](https://github.com/ha-parcel-integrations/ha-usps/issues/2).
 
 Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) family: it publishes the same canonical parcel format, statuses and events as the other carrier integrations, so it plugs straight into the [Parcel Aggregator](https://github.com/ha-parcel-integrations/ha-parcel-aggregator) and cross-carrier automations.
 
