@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from custom_components.usps.const import DOMAIN, ParcelStatus
 from custom_components.usps.sensor import (
+    USPSAwaitingPickupSensor,
     USPSDeliveredParcelsSensor,
     USPSIncomingParcelsSensor,
     USPSLastUpdateSensor,
@@ -153,6 +154,21 @@ def test_next_delivery_skips_an_unparseable_moment():
     )
     sensor = USPSNextDeliverySensor(coordinator, _entry())
     assert sensor.extra_state_attributes["barcode"] == "B"
+
+
+def test_awaiting_pickup_lists_only_parcels_at_a_pickup_point():
+    held = _parcel("HELD", status=ParcelStatus.AT_PICKUP_POINT)
+    sensor = USPSAwaitingPickupSensor(
+        _coordinator([held, _parcel("MOVING"), _parcel("OUT", status=ParcelStatus.OUT_FOR_DELIVERY)]),
+        _entry(),
+    )
+    assert sensor.unique_id == "cfg_awaiting_pickup"
+    assert sensor.native_value == 1
+    assert sensor.extra_state_attributes == {"parcels": [held]}
+
+
+def test_awaiting_pickup_is_zero_without_data():
+    assert USPSAwaitingPickupSensor(_coordinator(None), _entry()).native_value == 0
 
 
 def test_delivered_sensor_counts_the_coordinator_s_delivered_list():

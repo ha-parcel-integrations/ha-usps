@@ -140,6 +140,7 @@ Standard HA removal applies: **Settings → Devices & Services → USPS → ⋮ 
 | `sensor.usps_incoming_parcels` | Number of active tracked parcels, full list under the `parcels` attribute |
 | `sensor.usps_parcel_<code>` | One per tracked parcel; state is the canonical status, attributes carry the full normalised parcel |
 | `sensor.usps_next_delivery` | Earliest expected delivery moment across all active parcels |
+| `sensor.usps_awaiting_pickup` | Parcels held at a post office or ready for pickup; list under the `parcels` attribute |
 | `sensor.usps_delivered_parcels` | Recently delivered parcels (see the retention option) |
 | `sensor.usps_last_successful_update` | Diagnostic: when USPS was last polled successfully |
 

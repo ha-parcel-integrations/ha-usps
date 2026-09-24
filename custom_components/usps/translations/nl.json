@@ -165,6 +165,10 @@
       "next_delivery": {
         "name": "Volgende bezorging"
       },
+      "awaiting_pickup": {
+        "name": "Klaar voor afhalen",
+        "unit_of_measurement": "pakketten"
+      },
       "delivered_parcels": {
         "name": "Bezorgde pakketten",
         "unit_of_measurement": "pakketten"
