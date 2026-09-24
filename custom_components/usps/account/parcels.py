@@ -23,6 +23,7 @@ _STATUS_PREFIXES: tuple[tuple[str, ParcelStatus], ...] = (
     ("out for delivery", ParcelStatus.OUT_FOR_DELIVERY),
     ("preparing for delivery", ParcelStatus.IN_TRANSIT),
     ("on the way", ParcelStatus.IN_TRANSIT),
+    ("accepted", ParcelStatus.IN_TRANSIT),
     # The item is still with the shipper's own partner (Amazon's network,
     # typically); USPS has not scanned it yet.
     ("usps awaiting item", ParcelStatus.REGISTERED),

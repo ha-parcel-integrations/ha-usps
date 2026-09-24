@@ -81,12 +81,12 @@ def test_unparseable_delivery_date_is_none():
 
 
 def test_map_narrow_status_warns_once_and_never_reuses_api_tracking_prefixes(caplog):
-    # "Accepted" is a valid API Tracking prefix but not one of the three
-    # capture-backed Informed Delivery categories — it must stay unknown.
-    assert map_informed_delivery_status("Accepted") is ParcelStatus.UNKNOWN
+    # "Pre-Shipment" is a valid API Tracking prefix but not a capture-backed
+    # Informed Delivery category — it must stay unknown.
+    assert map_informed_delivery_status("Pre-Shipment") is ParcelStatus.UNKNOWN
     assert caplog.text.count("Unrecognised USPS Informed Delivery status") == 1
     caplog.clear()
-    assert map_informed_delivery_status("Accepted") is ParcelStatus.UNKNOWN
+    assert map_informed_delivery_status("Pre-Shipment") is ParcelStatus.UNKNOWN
     assert "Unrecognised" not in caplog.text
 
 
@@ -100,6 +100,10 @@ def test_on_the_way_is_in_transit():
     )
     assert parcel["status"] is ParcelStatus.IN_TRANSIT
     assert parcel["raw_status"] == "Arrived at USPS Facility"
+
+
+def test_accepted_is_in_transit():
+    assert map_informed_delivery_status("Accepted") is ParcelStatus.IN_TRANSIT
 
 
 def test_usps_awaiting_item_is_registered():
