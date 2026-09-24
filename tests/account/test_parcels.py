@@ -1,4 +1,6 @@
 """Informed Delivery inbox mapping tests."""
+import pytest
+
 from custom_components.usps.account.parcels import (
     map_informed_delivery_status,
     normalize_informed_delivery_parcel,
@@ -116,3 +118,40 @@ def test_usps_awaiting_item_is_registered():
     assert parcel["status"] is ParcelStatus.REGISTERED
     assert parcel["planned_from"] is None and parcel["planned_to"] is None
 
+
+@pytest.mark.parametrize(
+    ("text2", "expected"),
+    [
+        ("by 9:00pm", "2026-09-28T21:00:00-04:00"),
+        ("By 6:30 PM", "2026-09-28T18:30:00-04:00"),
+        ("by 12:00pm", "2026-09-28T12:00:00-04:00"),
+        ("by 11am", "2026-09-28T11:00:00-04:00"),
+    ],
+)
+def test_planned_to_uses_the_by_time_from_text2(text2, expected):
+    parcel = normalize_informed_delivery_parcel(
+        {
+            "trackingNumber": "9400",
+            "deliveryInfo": {"deliveryDate": "2026-09-28", "text2": text2, "statusCategory": "On the Way"},
+        }
+    )
+    assert parcel["planned_from"] == "2026-09-28T00:00:00-04:00"
+    assert parcel["planned_to"] == expected
+
+
+@pytest.mark.parametrize("text2", [None, "", "between 2pm and 4pm", "by 13:00pm", "by 9:75pm", "at 10:29 AM"])
+def test_planned_to_falls_back_to_end_of_day(text2):
+    parcel = normalize_informed_delivery_parcel(
+        {
+            "trackingNumber": "9400",
+            "deliveryInfo": {"deliveryDate": "2026-09-28", "text2": text2, "statusCategory": "On the Way"},
+        }
+    )
+    assert parcel["planned_to"] == "2026-09-28T23:59:59.999999-04:00"
+
+
+def test_by_time_without_a_parseable_date_is_none():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "deliveryInfo": {"deliveryDate": "not-a-date", "text2": "by 9:00pm", "statusCategory": "On the Way"}}
+    )
+    assert parcel["planned_to"] is None

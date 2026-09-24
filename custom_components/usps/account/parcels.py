@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, time
 from typing import Any
 
@@ -26,6 +27,8 @@ _STATUS_PREFIXES: tuple[tuple[str, ParcelStatus], ...] = (
     # typically); USPS has not scanned it yet.
     ("usps awaiting item", ParcelStatus.REGISTERED),
 )
+
+_BY_TIME = re.compile(r"^by\s+(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$", re.IGNORECASE)
 
 # Kept separate from API Tracking's one-shot-warned set: the two sources map
 # different vocabularies, and a code already warned about under one table
@@ -67,6 +70,28 @@ def _eastern_day(value: Any, *, end: bool = False) -> str | None:
         return None
 
 
+def _by_time(text: Any) -> time | None:
+    """Parse ``text2``'s ``"by 9:00pm"``; anything else is no deadline."""
+    match = _BY_TIME.match(str(text or "").strip())
+    if not match:
+        return None
+    hour, minute = int(match[1]), int(match[2] or 0)
+    if not 1 <= hour <= 12 or minute > 59:
+        return None
+    return time(hour % 12 + (12 if match[3].lower() == "p" else 0), minute)
+
+
+def _planned_to(value: Any, text2: Any) -> str | None:
+    deadline = _by_time(text2)
+    if deadline is None or not value:
+        return _eastern_day(value, end=True)
+    try:
+        day = datetime.fromisoformat(str(value)).date()
+    except ValueError:
+        return None
+    return datetime.combine(day, deadline, tzinfo=EASTERN).isoformat()
+
+
 def _eastern_timestamp(value: Any) -> str | None:
     """Interpret a naive ``eventTimestamp`` as ``America/New_York`` local time.
 
@@ -100,7 +125,7 @@ def normalize_informed_delivery_parcel(raw: dict[str, Any]) -> dict[str, Any]:
         "delivered": delivered,
         "delivered_at": _eastern_timestamp(raw.get("eventTimestamp")) if delivered else None,
         "planned_from": None if delivered else _eastern_day(delivery_date),
-        "planned_to": None if delivered else _eastern_day(delivery_date, end=True),
+        "planned_to": None if delivered else _planned_to(delivery_date, info.get("text2")),
         "pickup": None, "pickup_point": None, "url": tracking_url(barcode),
         "weight": None, "dimensions": None, "history": None,
         # Keep the complete source record for downstream debugging and
