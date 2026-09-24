@@ -90,3 +90,29 @@ def test_map_narrow_status_warns_once_and_never_reuses_api_tracking_prefixes(cap
 
 def test_map_narrow_status_none_is_silent():
     assert map_informed_delivery_status(None) is ParcelStatus.UNKNOWN
+
+
+def test_on_the_way_is_in_transit():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "deliveryInfo": {"statusCategory": "On the Way", "status": "Arrived at USPS Facility"}}
+    )
+    assert parcel["status"] is ParcelStatus.IN_TRANSIT
+    assert parcel["raw_status"] == "Arrived at USPS Facility"
+
+
+def test_usps_awaiting_item_is_registered():
+    parcel = normalize_informed_delivery_parcel(
+        {
+            "trackingNumber": "9361",
+            "shipperName": "AMAZON",
+            "deliveryInfo": {
+                "identifier": "UNKNOWN",
+                "text1": "Delivery Date Unknown",
+                "status": "Picked up by Shipping Partner",
+                "statusCategory": "USPS Awaiting Item",
+            },
+        }
+    )
+    assert parcel["status"] is ParcelStatus.REGISTERED
+    assert parcel["planned_from"] is None and parcel["planned_to"] is None
+

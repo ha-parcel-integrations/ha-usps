@@ -14,7 +14,7 @@ A custom Home Assistant integration for two separate USPS sources:
 
 Each config entry uses one source; you can add both.
 
-> **Pre-release.** Signing in to Informed Delivery is confirmed against a real account, but neither source has seen real package data yet. Statuses may be incomplete. Can you help test? See [#1 (Informed Delivery)](https://github.com/ha-parcel-integrations/ha-usps/issues/1) and [#2 (API Tracking)](https://github.com/ha-parcel-integrations/ha-usps/issues/2).
+> **Pre-release.** Informed Delivery is confirmed against a real account with packages, but API Tracking has not seen real package data yet. Statuses may be incomplete. Can you help test? See [#1 (Informed Delivery)](https://github.com/ha-parcel-integrations/ha-usps/issues/1) and [#2 (API Tracking)](https://github.com/ha-parcel-integrations/ha-usps/issues/2).
 
 Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) family: it publishes the same canonical parcel format, statuses and events as the other carrier integrations, so it plugs straight into the [Parcel Aggregator](https://github.com/ha-parcel-integrations/ha-parcel-aggregator) and cross-carrier automations.
 
@@ -147,7 +147,7 @@ A delivered parcel moves from its per-parcel sensor to the delivered sensor auto
 
 ## Parcel status reference
 
-The `status` field is the carrier-agnostic enum shared by the whole integration family. Informed Delivery only reaches `delivered` / `out_for_delivery` / `in_transit` / `unknown`; API Tracking's broader vocabulary can plausibly reach every status below:
+The `status` field is the carrier-agnostic enum shared by the whole integration family. Informed Delivery only reaches `registered` / `in_transit` / `out_for_delivery` / `delivered` / `unknown`; API Tracking's broader vocabulary can plausibly reach every status below:
 
 | Status | Meaning |
 |---|---|
