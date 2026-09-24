@@ -1,11 +1,20 @@
 """Informed Delivery inbox mapping tests."""
+from zoneinfo import ZoneInfo
+
 import pytest
 
+from custom_components.usps.account.client import EASTERN
+from custom_components.usps.account.parcels import map_informed_delivery_status
 from custom_components.usps.account.parcels import (
-    map_informed_delivery_status,
-    normalize_informed_delivery_parcel,
+    normalize_informed_delivery_parcel as _normalize,
 )
 from custom_components.usps.const import ParcelStatus
+
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+
+def normalize_informed_delivery_parcel(raw):
+    return _normalize(raw, tz=EASTERN)
 
 
 def test_inbox_record_maps_to_eastern_delivery_window():
@@ -195,3 +204,23 @@ def test_by_time_without_a_parseable_date_is_none():
         {"trackingNumber": "9400", "deliveryInfo": {"deliveryDate": "not-a-date", "text2": "by 9:00pm", "statusCategory": "On the Way"}}
     )
     assert parcel["planned_to"] is None
+
+
+def test_package_times_follow_the_given_zone():
+    """A Pacific tester's scans only lined up with HA's state changes read as Pacific."""
+    parcel = _normalize(
+        {
+            "trackingNumber": "9361",
+            "eventTimestamp": "2026-09-24T07:33:00",
+            "deliveryInfo": {"deliveryDate": "2026-09-24", "text2": "between 1:00pm and 3:00pm", "statusCategory": "Out for Delivery"},
+        },
+        tz=PACIFIC,
+    )
+    assert parcel["planned_from"] == "2026-09-24T13:00:00-07:00"
+    assert parcel["planned_to"] == "2026-09-24T15:00:00-07:00"
+    delivered = _normalize(
+        {"trackingNumber": "9361", "eventTimestamp": "2026-09-24T14:05:00", "deliveryInfo": {"statusCategory": "Delivered"}},
+        tz=PACIFIC,
+    )
+    assert delivered["delivered_at"] == "2026-09-24T14:05:00-07:00"
+

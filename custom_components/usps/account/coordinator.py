@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from ..api.client import USPSApiError, USPSAuthError
 from ..const import DOMAIN
@@ -115,7 +116,7 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if code:
                 seen.add(code)
                 first_by_code[code] = row
-            parcels.append(normalize_informed_delivery_parcel(row))
+            parcels.append(normalize_informed_delivery_parcel(row, tz=dt_util.get_default_time_zone()))
         self.delivered = [parcel for parcel in parcels if parcel["delivered"]]
         self._last_good = [parcel for parcel in parcels if not parcel["delivered"]]
         _LOGGER.debug(

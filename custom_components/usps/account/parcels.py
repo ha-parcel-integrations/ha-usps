@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, time
+from datetime import datetime, time, tzinfo
 from typing import Any
 
 from ..api.parcels import NEW_ISSUE_URL, tracking_url
 from ..const import ParcelStatus
-from .client import EASTERN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,11 +63,11 @@ def map_informed_delivery_status(code: str | None) -> ParcelStatus:
     return ParcelStatus.UNKNOWN
 
 
-def _eastern_day(value: Any, *, end: bool = False) -> str | None:
+def _local_day(value: Any, tz: tzinfo, *, end: bool = False) -> str | None:
     if not value:
         return None
     try:
-        return datetime.combine(datetime.fromisoformat(str(value)).date(), time.max if end else time.min, tzinfo=EASTERN).isoformat()
+        return datetime.combine(datetime.fromisoformat(str(value)).date(), time.max if end else time.min, tzinfo=tz).isoformat()
     except ValueError:
         return None
 
@@ -97,28 +96,22 @@ def _text2_window(text: Any) -> tuple[time | None, time | None]:
     return None, None
 
 
-def _planned_window(value: Any, text2: Any) -> tuple[str | None, str | None]:
+def _planned_window(value: Any, text2: Any, tz: tzinfo) -> tuple[str | None, str | None]:
     start, end = _text2_window(text2)
     if not value or (start is None and end is None):
-        return _eastern_day(value), _eastern_day(value, end=True)
+        return _local_day(value, tz), _local_day(value, tz, end=True)
     try:
         day = datetime.fromisoformat(str(value)).date()
     except ValueError:
         return None, None
     return (
-        datetime.combine(day, start or time.min, tzinfo=EASTERN).isoformat(),
-        datetime.combine(day, end or time.max, tzinfo=EASTERN).isoformat(),
+        datetime.combine(day, start or time.min, tzinfo=tz).isoformat(),
+        datetime.combine(day, end or time.max, tzinfo=tz).isoformat(),
     )
 
 
-def _eastern_timestamp(value: Any) -> str | None:
-    """Interpret a naive ``eventTimestamp`` as ``America/New_York`` local time.
-
-    The package-search payload sends a bare local timestamp with no
-    timezone (e.g. ``"2026-08-14T10:29:00"``) — parsed here the same way
-    :func:`_eastern_day` already treats ``deliveryDate``, so both fields
-    agree on what "today" means.
-    """
+def _local_timestamp(value: Any, tz: tzinfo) -> str | None:
+    """Attach ``tz`` to a naive ``eventTimestamp``."""
     if not value:
         return None
     try:
@@ -126,24 +119,29 @@ def _eastern_timestamp(value: Any) -> str | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=EASTERN)
+        parsed = parsed.replace(tzinfo=tz)
     return parsed.isoformat()
 
 
-def normalize_informed_delivery_parcel(raw: dict[str, Any]) -> dict[str, Any]:
-    """Normalise a current-state inbox record without inventing history."""
+def normalize_informed_delivery_parcel(raw: dict[str, Any], *, tz: tzinfo) -> dict[str, Any]:
+    """Normalise a current-state inbox record without inventing history.
+
+    Package times are naive and local to the enrolled address, not US Eastern
+    like the request date, so ``tz`` is the address's zone (in practice Home
+    Assistant's own).
+    """
     info = raw.get("deliveryInfo") if isinstance(raw.get("deliveryInfo"), dict) else {}
     category = info.get("statusCategory") or info.get("status")
     status = map_informed_delivery_status(category)
     delivered = status is ParcelStatus.DELIVERED
     barcode = raw.get("trackingNumber")
     delivery_date = info.get("deliveryDate") or raw.get("expectedDeliveryDate")
-    planned_from, planned_to = (None, None) if delivered else _planned_window(delivery_date, info.get("text2"))
+    planned_from, planned_to = (None, None) if delivered else _planned_window(delivery_date, info.get("text2"), tz)
     return {
         "carrier": "USPS", "barcode": barcode, "sender": raw.get("shipperName") or None,
         "receiver": None, "status": status, "raw_status": info.get("status") or category,
         "delivered": delivered,
-        "delivered_at": _eastern_timestamp(raw.get("eventTimestamp")) if delivered else None,
+        "delivered_at": _local_timestamp(raw.get("eventTimestamp"), tz) if delivered else None,
         "planned_from": planned_from, "planned_to": planned_to,
         "pickup": None, "pickup_point": None, "url": tracking_url(barcode),
         "weight": None, "dimensions": None, "history": None,
