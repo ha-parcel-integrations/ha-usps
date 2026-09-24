@@ -29,7 +29,9 @@ _STATUS_PREFIXES: tuple[tuple[str, ParcelStatus], ...] = (
     ("usps awaiting item", ParcelStatus.REGISTERED),
 )
 
-_BY_TIME = re.compile(r"^by\s+(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$", re.IGNORECASE)
+_TIME = r"(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?"
+_BY_TIME = re.compile(rf"^by\s+{_TIME}$", re.IGNORECASE)
+_BETWEEN_TIMES = re.compile(rf"^between\s+{_TIME}\s+and\s+{_TIME}$", re.IGNORECASE)
 
 # Kept separate from API Tracking's one-shot-warned set: the two sources map
 # different vocabularies, and a code already warned about under one table
@@ -71,26 +73,42 @@ def _eastern_day(value: Any, *, end: bool = False) -> str | None:
         return None
 
 
-def _by_time(text: Any) -> time | None:
-    """Parse ``text2``'s ``"by 9:00pm"``; anything else is no deadline."""
-    match = _BY_TIME.match(str(text or "").strip())
-    if not match:
+def _clock(hour: str, minute: str | None, meridiem: str) -> time | None:
+    h, m = int(hour), int(minute or 0)
+    if not 1 <= h <= 12 or m > 59:
         return None
-    hour, minute = int(match[1]), int(match[2] or 0)
-    if not 1 <= hour <= 12 or minute > 59:
-        return None
-    return time(hour % 12 + (12 if match[3].lower() == "p" else 0), minute)
+    return time(h % 12 + (12 if meridiem.lower() == "p" else 0), m)
 
 
-def _planned_to(value: Any, text2: Any) -> str | None:
-    deadline = _by_time(text2)
-    if deadline is None or not value:
-        return _eastern_day(value, end=True)
+def _text2_window(text: Any) -> tuple[time | None, time | None]:
+    """Parse ``text2``'s ``"by 9:00pm"`` / ``"between 1:00pm and 3:00pm"``.
+
+    Anything else, or a nonsensical time, yields no bound so the caller keeps
+    the whole day.
+    """
+    value = str(text or "").strip()
+    if match := _BY_TIME.match(value):
+        return None, _clock(*match.groups())
+    if match := _BETWEEN_TIMES.match(value):
+        start, end = _clock(*match.groups()[:3]), _clock(*match.groups()[3:])
+        if start is None or end is None or start >= end:
+            return None, None
+        return start, end
+    return None, None
+
+
+def _planned_window(value: Any, text2: Any) -> tuple[str | None, str | None]:
+    start, end = _text2_window(text2)
+    if not value or (start is None and end is None):
+        return _eastern_day(value), _eastern_day(value, end=True)
     try:
         day = datetime.fromisoformat(str(value)).date()
     except ValueError:
-        return None
-    return datetime.combine(day, deadline, tzinfo=EASTERN).isoformat()
+        return None, None
+    return (
+        datetime.combine(day, start or time.min, tzinfo=EASTERN).isoformat(),
+        datetime.combine(day, end or time.max, tzinfo=EASTERN).isoformat(),
+    )
 
 
 def _eastern_timestamp(value: Any) -> str | None:
@@ -120,13 +138,13 @@ def normalize_informed_delivery_parcel(raw: dict[str, Any]) -> dict[str, Any]:
     delivered = status is ParcelStatus.DELIVERED
     barcode = raw.get("trackingNumber")
     delivery_date = info.get("deliveryDate") or raw.get("expectedDeliveryDate")
+    planned_from, planned_to = (None, None) if delivered else _planned_window(delivery_date, info.get("text2"))
     return {
         "carrier": "USPS", "barcode": barcode, "sender": raw.get("shipperName") or None,
         "receiver": None, "status": status, "raw_status": info.get("status") or category,
         "delivered": delivered,
         "delivered_at": _eastern_timestamp(raw.get("eventTimestamp")) if delivered else None,
-        "planned_from": None if delivered else _eastern_day(delivery_date),
-        "planned_to": None if delivered else _planned_to(delivery_date, info.get("text2")),
+        "planned_from": planned_from, "planned_to": planned_to,
         "pickup": None, "pickup_point": None, "url": tracking_url(barcode),
         "weight": None, "dimensions": None, "history": None,
         # Keep the complete source record for downstream debugging and

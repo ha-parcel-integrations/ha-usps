@@ -76,9 +76,9 @@ Outgoing parcels are not supported yet either.
 
 Both sources deliberately return `None` for weight, dimensions and pickup
 point data. API Tracking alone can expose structured history; Informed Delivery
-alone can expose a delivery window: `deliveryDate` as the day, with
-`planned_to` narrowed to `text2`'s `by 9:00pm` deadline when it parses and
-end of day otherwise. Diagnostics redact all credentials, tokens,
+alone can expose a delivery window: `deliveryDate` as the day, narrowed by
+`text2` when it parses — `by 9:00pm` sets `planned_to`, `between 1:00pm and
+3:00pm` sets both ends — and the whole day otherwise. Diagnostics redact all credentials, tokens,
 ZIP11 data, tracking codes and raw package identifiers.
 
 ## Options and reloads

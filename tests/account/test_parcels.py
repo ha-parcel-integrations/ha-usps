@@ -143,7 +143,43 @@ def test_planned_to_uses_the_by_time_from_text2(text2, expected):
     assert parcel["planned_to"] == expected
 
 
-@pytest.mark.parametrize("text2", [None, "", "between 2pm and 4pm", "by 13:00pm", "by 9:75pm", "at 10:29 AM"])
+def test_between_times_in_text2_become_the_planned_window():
+    parcel = normalize_informed_delivery_parcel(
+        {
+            "trackingNumber": "9361",
+            "deliveryInfo": {
+                "deliveryDate": "2026-09-24",
+                "identifier": "TODAY",
+                "text1": "Expected Delivery",
+                "text2": "between 1:00pm and 3:00pm",
+                "status": "Out for Delivery, Expected Delivery Between 1:00pm and 3:00pm",
+                "statusCategory": "Out for Delivery",
+            },
+        }
+    )
+    assert parcel["status"] is ParcelStatus.OUT_FOR_DELIVERY
+    assert parcel["planned_from"] == "2026-09-24T13:00:00-04:00"
+    assert parcel["planned_to"] == "2026-09-24T15:00:00-04:00"
+
+
+def test_between_without_minutes_parses():
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "deliveryInfo": {"deliveryDate": "2026-09-24", "text2": "Between 11am and 1 PM", "statusCategory": "On the Way"}}
+    )
+    assert parcel["planned_from"] == "2026-09-24T11:00:00-04:00"
+    assert parcel["planned_to"] == "2026-09-24T13:00:00-04:00"
+
+
+@pytest.mark.parametrize("text2", ["between 3:00pm and 1:00pm", "between 13:00pm and 3:00pm", "between 1:00pm and 3:75pm"])
+def test_unusable_between_window_falls_back_to_the_whole_day(text2):
+    parcel = normalize_informed_delivery_parcel(
+        {"trackingNumber": "9400", "deliveryInfo": {"deliveryDate": "2026-09-24", "text2": text2, "statusCategory": "On the Way"}}
+    )
+    assert parcel["planned_from"] == "2026-09-24T00:00:00-04:00"
+    assert parcel["planned_to"] == "2026-09-24T23:59:59.999999-04:00"
+
+
+@pytest.mark.parametrize("text2", [None, "", "around 2pm", "by 13:00pm", "by 9:75pm", "at 10:29 AM"])
 def test_planned_to_falls_back_to_end_of_day(text2):
     parcel = normalize_informed_delivery_parcel(
         {
