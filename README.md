@@ -52,7 +52,7 @@ Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) 
 
 ## Requirements
 
-- Home Assistant 2024.12 or newer
+- Home Assistant 2025.12 or newer
 - Informed Delivery: a USPS account with at least one address enrolled at [informeddelivery.usps.com](https://informeddelivery.usps.com)
 - API Tracking: an app on the [USPS developer portal](https://developers.usps.com) with the Tracking API added, and its Consumer Key and Consumer Secret
 
