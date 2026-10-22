@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -32,8 +33,10 @@ _LOGGER = logging.getLogger(__name__)
 class USPSData:
     """Runtime data attached to the USPS config entry."""
 
-    client: object
-    coordinator: object
+    client: ApiTrackingClient | InformedDeliveryClient
+    # Both coordinators expose the same surface to the platforms, which are
+    # typed against USPSCoordinator.
+    coordinator: Any
 
 
 type USPSConfigEntry = ConfigEntry[USPSData]
@@ -48,6 +51,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     refresh below as ``ConfigEntryAuthFailed``, which HA turns into a reauth
     prompt on its own.
     """
+    client: ApiTrackingClient | InformedDeliveryClient
+    coordinator: USPSCoordinator | InformedDeliveryCoordinator
     if entry.data.get(CONF_SOURCE) == SOURCE_API_TRACKING:
         client = ApiTrackingClient(
             entry.data[CONF_CONSUMER_KEY],
@@ -63,10 +68,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
         # ClientSession sharing HA's pooled one), so it is ours to close.
         session = async_new_informed_delivery_session(hass)
         entry.async_on_unload(session.close)
-        client = InformedDeliveryClient(
+        id_client = InformedDeliveryClient(
             entry.data["access_token"], entry.data[CONF_REFRESH_TOKEN], session
         )
-        coordinator = InformedDeliveryCoordinator(hass, client, entry)
+        client = id_client
+        coordinator = InformedDeliveryCoordinator(hass, id_client, entry)
     else:
         raise ValueError("USPS entry has no supported source")
 
@@ -79,7 +85,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
 
     entry.runtime_data = USPSData(client=client, coordinator=coordinator)
 
-    if entry.data.get(CONF_SOURCE) == SOURCE_INFORMED_DELIVERY:
+    if isinstance(coordinator, InformedDeliveryCoordinator):
         entry.async_on_unload(coordinator.async_start_keepalive())
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

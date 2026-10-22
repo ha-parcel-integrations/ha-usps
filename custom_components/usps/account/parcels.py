@@ -139,7 +139,8 @@ def normalize_informed_delivery_parcel(
     like the request date, so ``tz`` is the address's zone (in practice Home
     Assistant's own).
     """
-    info = raw.get("deliveryInfo") if isinstance(raw.get("deliveryInfo"), dict) else {}
+    raw_info = raw.get("deliveryInfo")
+    info = raw_info if isinstance(raw_info, dict) else {}
     category = info.get("statusCategory") or info.get("status")
     status = map_informed_delivery_status(category)
     delivered = status is ParcelStatus.DELIVERED

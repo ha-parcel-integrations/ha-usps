@@ -480,7 +480,7 @@ class LoginJourney:
         # value-presence check.
         self._answered_ids: set[int] = set()
 
-    async def start(self, username: str, password: str) -> str | None:
+    async def start(self, username: str, password: str) -> str:
         """Begin the journey and return a ``tokenId`` once it completes."""
         async with self._session.get(f"{AM}/json/serverinfo/*") as response:
             _LOGGER.debug(
@@ -502,7 +502,7 @@ class LoginJourney:
         )
         return await self._advance(username, password)
 
-    async def answer(self, answer: str) -> str | None:
+    async def answer(self, answer: str) -> str:
         """Answer the current pending challenge and resume the journey."""
         if self.pending_callback is None:
             raise USPSAuthError("No USPS login challenge is pending")
@@ -528,7 +528,7 @@ class LoginJourney:
 
     async def _advance(
         self, username: str | None = None, password: str | None = None
-    ) -> str | None:
+    ) -> str:
         push_approval_elapsed = 0.0
         for round_number in range(MAX_AUTO_ADVANCE):
             async with self._session.post(

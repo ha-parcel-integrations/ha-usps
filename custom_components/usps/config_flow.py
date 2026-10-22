@@ -228,6 +228,8 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_finish_informed_delivery(self, token_id: str) -> ConfigFlowResult:
         """Exchange a completed journey's ``tokenId`` and create/update the entry."""
         journey = self._id_journey
+        if journey is None:
+            raise USPSAuthError("No USPS login is in progress")
         tokens, profile = await journey.finish(token_id)
         addresses = enrolled_addresses(profile)
         if not addresses:

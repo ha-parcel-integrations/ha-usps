@@ -26,6 +26,8 @@ _LOGGER = logging.getLogger(__name__)
 class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     """Poll all enrolled addresses while preserving separate source data."""
 
+    config_entry: ConfigEntry
+
     def __init__(
         self, hass: HomeAssistant, client: InformedDeliveryClient, entry: ConfigEntry
     ) -> None:
