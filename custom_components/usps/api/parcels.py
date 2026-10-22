@@ -14,10 +14,11 @@ the history builder, the sort contract, the delivered filter, the one-shot
 warning for unmapped statuses — is suite-wide machinery and should be left
 alone.
 """
+
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -134,11 +135,11 @@ def parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(value))
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 
@@ -154,7 +155,7 @@ def to_iso_timestamp(value: Any) -> str | None:
         return None
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(value / 1000, tz=timezone.utc).isoformat()
+            return datetime.fromtimestamp(value / 1000, tz=UTC).isoformat()
         except (OverflowError, OSError, ValueError):
             return None
     return str(value)
@@ -201,7 +202,9 @@ def build_history(
             continue
         entry = {
             "timestamp": timestamp,
-            "status": map_event_status(event.get("eventType") or event.get("statusCategory")),
+            "status": map_event_status(
+                event.get("eventType") or event.get("statusCategory")
+            ),
             "raw_status": event.get("eventCode") or event.get("eventType"),
         }
         parsed = parse_iso(timestamp)
@@ -221,7 +224,9 @@ def tracking_url(tracking_code: str | None) -> str | None:
     return TRACKING_URL.format(tracking_code=tracking_code)
 
 
-def normalize_api_tracking_parcel(raw: dict, *, include_history: bool = False, configured_code: str | None = None) -> dict:
+def normalize_api_tracking_parcel(
+    raw: dict, *, include_history: bool = False, configured_code: str | None = None
+) -> dict:
     """Return a carrier-agnostic parcel dict with the payload under ``raw``.
 
     The **keys of the returned dict are the contract**: every carrier in the
@@ -246,8 +251,18 @@ def normalize_api_tracking_parcel(raw: dict, *, include_history: bool = False, c
     delivered = status is ParcelStatus.DELIVERED
 
     events = raw.get("trackingEvents")
-    delivered_events = [event for event in events or [] if isinstance(event, dict) and map_event_status(event.get("eventType") or event.get("statusCategory")) is ParcelStatus.DELIVERED]
-    delivered_at = to_iso_timestamp(delivered_events[-1].get("eventTimestamp")) if delivered_events else None
+    delivered_events = [
+        event
+        for event in events or []
+        if isinstance(event, dict)
+        and map_event_status(event.get("eventType") or event.get("statusCategory"))
+        is ParcelStatus.DELIVERED
+    ]
+    delivered_at = (
+        to_iso_timestamp(delivered_events[-1].get("eventTimestamp"))
+        if delivered_events
+        else None
+    )
 
     return {
         "carrier": "USPS",
@@ -305,14 +320,12 @@ def apply_delivered_filter(parcels: list[dict], entry: ConfigEntry) -> list[dict
     shows.
     """
     options = entry.options
-    filter_type = options.get(
-        CONF_DELIVERED_FILTER_TYPE, DEFAULT_DELIVERED_FILTER_TYPE
-    )
+    filter_type = options.get(CONF_DELIVERED_FILTER_TYPE, DEFAULT_DELIVERED_FILTER_TYPE)
     amount = int(
         options.get(CONF_DELIVERED_FILTER_AMOUNT, DEFAULT_DELIVERED_FILTER_AMOUNT)
     )
     if filter_type == "days":
-        cutoff = datetime.now(timezone.utc) - timedelta(days=amount)
+        cutoff = datetime.now(UTC) - timedelta(days=amount)
         return [
             parcel
             for parcel in parcels

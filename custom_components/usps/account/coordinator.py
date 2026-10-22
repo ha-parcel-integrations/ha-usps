@@ -1,10 +1,11 @@
 """Coordinator for the address-inbox Informed Delivery source."""
+
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
+import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -25,12 +26,20 @@ _LOGGER = logging.getLogger(__name__)
 class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     """Poll all enrolled addresses while preserving separate source data."""
 
-    def __init__(self, hass: HomeAssistant, client: InformedDeliveryClient, entry: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, client: InformedDeliveryClient, entry: ConfigEntry
+    ) -> None:
         """Initialise a fixed-cadence, source-isolated coordinator."""
         # USPS rotates its refresh token roughly every 15 minutes.  Polling at
         # ten minutes keeps the chain alive while HA is running; a longer
         # interval can silently turn an otherwise healthy entry into reauth.
-        super().__init__(hass, _LOGGER, name=DOMAIN, config_entry=entry, update_interval=timedelta(minutes=10))
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            config_entry=entry,
+            update_interval=timedelta(minutes=10),
+        )
         self._client = client
         self.delivered: list[dict[str, Any]] = []
         self._current_tier_minutes = 10
@@ -51,6 +60,7 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
 
     def async_start_keepalive(self) -> Callable[[], None]:
         """Refresh the rotating token chain independently of inbox polling."""
+
         async def _keepalive(_now: datetime) -> None:
             self.logger.debug("USPS Informed Delivery: keepalive refresh firing")
             try:
@@ -64,11 +74,16 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                         },
                     )
             except USPSAuthError:
-                self.logger.warning("USPS Informed Delivery token refresh failed — starting reauth")
+                self.logger.warning(
+                    "USPS Informed Delivery token refresh failed — starting reauth"
+                )
                 self.hass.async_create_task(
                     self.hass.config_entries.flow.async_init(
                         DOMAIN,
-                        context={"source": "reauth", "entry_id": self.config_entry.entry_id},
+                        context={
+                            "source": "reauth",
+                            "entry_id": self.config_entry.entry_id,
+                        },
                         data=self.config_entry.data,
                     )
                 )
@@ -91,14 +106,24 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 async with self._refresh_lock:
                     if self._client.refresh_generation == generation:
                         await self._client.async_refresh()
-                    self.hass.config_entries.async_update_entry(self.config_entry, data={**self.config_entry.data, "refresh_token": self._client.refresh_token})
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data={
+                            **self.config_entry.data,
+                            "refresh_token": self._client.refresh_token,
+                        },
+                    )
                 rows = []
                 for address in addresses:
                     rows.extend(await self._client.async_get_packages(address["zip11"]))
             except USPSAuthError as refresh_err:
-                raise ConfigEntryAuthFailed("Informed Delivery requires reauthentication") from refresh_err
+                raise ConfigEntryAuthFailed(
+                    "Informed Delivery requires reauthentication"
+                ) from refresh_err
         except USPSAuthError as err:
-            raise ConfigEntryAuthFailed("Informed Delivery requires reauthentication") from err
+            raise ConfigEntryAuthFailed(
+                "Informed Delivery requires reauthentication"
+            ) from err
         except USPSApiError as err:
             if self._last_good:
                 return self._last_good
@@ -116,7 +141,11 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if code:
                 seen.add(code)
                 first_by_code[code] = row
-            parcels.append(normalize_informed_delivery_parcel(row, tz=dt_util.get_default_time_zone()))
+            parcels.append(
+                normalize_informed_delivery_parcel(
+                    row, tz=dt_util.get_default_time_zone()
+                )
+            )
         self.delivered = [parcel for parcel in parcels if parcel["delivered"]]
         self._last_good = [parcel for parcel in parcels if not parcel["delivered"]]
         _LOGGER.debug(

@@ -1,4 +1,5 @@
 """Informed Delivery setup smoke test for shared HA platforms."""
+
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -13,10 +14,27 @@ from custom_components.usps.const import (
 
 
 async def test_informed_delivery_setup_exposes_inbox_entities(hass):
-    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SOURCE: SOURCE_INFORMED_DELIVERY, "access_token": "access", CONF_REFRESH_TOKEN: "refresh", "addresses": [{"zip11": "12345678901"}]})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_SOURCE: SOURCE_INFORMED_DELIVERY,
+            "access_token": "access",
+            CONF_REFRESH_TOKEN: "refresh",
+            "addresses": [{"zip11": "12345678901"}],
+        },
+    )
     entry.add_to_hass(hass)
-    package = {"trackingNumber": "9400", "deliveryInfo": {"statusCategory": "Out for Delivery", "deliveryDate": "2026-09-16"}}
-    with patch("custom_components.usps.account.client.InformedDeliveryClient.async_get_packages", new=AsyncMock(return_value=[package])):
+    package = {
+        "trackingNumber": "9400",
+        "deliveryInfo": {
+            "statusCategory": "Out for Delivery",
+            "deliveryDate": "2026-09-16",
+        },
+    }
+    with patch(
+        "custom_components.usps.account.client.InformedDeliveryClient.async_get_packages",
+        new=AsyncMock(return_value=[package]),
+    ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED

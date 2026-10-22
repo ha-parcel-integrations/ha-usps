@@ -4,7 +4,8 @@ The sensors read normalised parcel dicts off ``coordinator.data``; the
 ``_parcel`` helper here builds that shape directly, bypassing the
 raw-to-normalised step each backend's own ``test_parcels.py`` covers.
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from custom_components.usps.const import DOMAIN, ParcelStatus
@@ -18,7 +19,9 @@ from custom_components.usps.sensor import (
 )
 
 
-def _coordinator(data: list[dict] | None, delivered: list[dict] | None = None) -> MagicMock:
+def _coordinator(
+    data: list[dict] | None, delivered: list[dict] | None = None
+) -> MagicMock:
     coordinator = MagicMock()
     coordinator.data = data
     coordinator.delivered = delivered if delivered is not None else []
@@ -65,7 +68,9 @@ def test_incoming_spawns_a_sensor_for_each_newly_seen_parcel():
     )
     sensor.hass = MagicMock()
 
-    with patch.object(USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"):
+    with patch.object(
+        USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"
+    ):
         sensor._handle_coordinator_update()
 
     spawned = list(async_add_entities.call_args[0][0])
@@ -89,9 +94,12 @@ def test_incoming_removes_a_vanished_parcel_through_the_registry():
     registry = MagicMock()
     registry.async_get_entity_id.return_value = "sensor.usps_parcel_gone"
 
-    with patch(
-        "custom_components.usps.sensor.er.async_get", return_value=registry
-    ), patch.object(USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"):
+    with (
+        patch("custom_components.usps.sensor.er.async_get", return_value=registry),
+        patch.object(
+            USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"
+        ),
+    ):
         sensor._handle_coordinator_update()
 
     registry.async_get_entity_id.assert_called_once_with("sensor", DOMAIN, "cfg_GONE")
@@ -104,10 +112,11 @@ def test_incoming_leaves_the_registry_alone_when_a_parcel_is_only_added():
     )
     sensor.hass = MagicMock()
 
-    with patch(
-        "custom_components.usps.sensor.er.async_get"
-    ) as async_get, patch.object(
-        USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"
+    with (
+        patch("custom_components.usps.sensor.er.async_get") as async_get,
+        patch.object(
+            USPSIncomingParcelsSensor.__bases__[0], "_handle_coordinator_update"
+        ),
     ):
         sensor._handle_coordinator_update()
 
@@ -135,7 +144,7 @@ def test_next_delivery_picks_the_earliest_moment():
         ]
     )
     sensor = USPSNextDeliverySensor(coordinator, _entry())
-    assert sensor.native_value == datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)
+    assert sensor.native_value == datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
     assert sensor.extra_state_attributes["barcode"] == "B"
 
 
@@ -159,7 +168,13 @@ def test_next_delivery_skips_an_unparseable_moment():
 def test_awaiting_pickup_lists_only_parcels_at_a_pickup_point():
     held = _parcel("HELD", status=ParcelStatus.AT_PICKUP_POINT)
     sensor = USPSAwaitingPickupSensor(
-        _coordinator([held, _parcel("MOVING"), _parcel("OUT", status=ParcelStatus.OUT_FOR_DELIVERY)]),
+        _coordinator(
+            [
+                held,
+                _parcel("MOVING"),
+                _parcel("OUT", status=ParcelStatus.OUT_FOR_DELIVERY),
+            ]
+        ),
         _entry(),
     )
     assert sensor.unique_id == "cfg_awaiting_pickup"
@@ -182,7 +197,7 @@ def test_delivered_sensor_counts_the_coordinator_s_delivered_list():
 
 def test_last_update_sensor_reports_the_last_successful_poll():
     coordinator = _coordinator([])
-    moment = datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc)
+    moment = datetime(2026, 6, 30, 12, 0, tzinfo=UTC)
     coordinator.last_success_time = moment
     sensor = USPSLastUpdateSensor(coordinator, _entry())
     assert sensor.native_value == moment

@@ -1,8 +1,9 @@
 """USPS parcel tracker custom component for Home Assistant."""
+
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -48,7 +49,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     prompt on its own.
     """
     if entry.data.get(CONF_SOURCE) == SOURCE_API_TRACKING:
-        client = ApiTrackingClient(entry.data[CONF_CONSUMER_KEY], entry.data[CONF_CONSUMER_SECRET], async_get_clientsession(hass))
+        client = ApiTrackingClient(
+            entry.data[CONF_CONSUMER_KEY],
+            entry.data[CONF_CONSUMER_SECRET],
+            async_get_clientsession(hass),
+        )
         coordinator = USPSCoordinator(hass, client, entry)
     elif entry.data.get(CONF_SOURCE) == SOURCE_INFORMED_DELIVERY:
         # Never HA's shared session — the Akamai edge in front of
@@ -58,7 +63,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
         # ClientSession sharing HA's pooled one), so it is ours to close.
         session = async_new_informed_delivery_session(hass)
         entry.async_on_unload(session.close)
-        client = InformedDeliveryClient(entry.data["access_token"], entry.data[CONF_REFRESH_TOKEN], session)
+        client = InformedDeliveryClient(
+            entry.data["access_token"], entry.data[CONF_REFRESH_TOKEN], session
+        )
         coordinator = InformedDeliveryCoordinator(hass, client, entry)
     else:
         raise ValueError("USPS entry has no supported source")
@@ -90,9 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     return True
 
 
-async def _async_options_updated(
-    hass: HomeAssistant, entry: USPSConfigEntry
-) -> None:
+async def _async_options_updated(hass: HomeAssistant, entry: USPSConfigEntry) -> None:
     """Apply changed options by refreshing the coordinator."""
     await entry.runtime_data.coordinator.async_request_refresh()
 
@@ -101,6 +106,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> boo
     """Unload the USPS config entry."""
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
-    if not any(other.data.get(CONF_SOURCE) == SOURCE_API_TRACKING for other in hass.config_entries.async_entries("usps") if other.entry_id != entry.entry_id):
+    if not any(
+        other.data.get(CONF_SOURCE) == SOURCE_API_TRACKING
+        for other in hass.config_entries.async_entries("usps")
+        if other.entry_id != entry.entry_id
+    ):
         async_unload_services(hass)
     return True

@@ -1,4 +1,5 @@
 """Diagnostics support for the USPS parcel tracker integration."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,9 +23,17 @@ TO_REDACT = {
     # Business Tracking (client_credentials) and Informed Delivery (ForgeRock)
     # credentials and tokens. client_id is a hardcoded public portal client —
     # not a secret — and is intentionally not listed here.
-    "consumer_key", "consumer_secret", "refresh_token", "access_token",
-    "id_token", "username", "password", "tokenId", "authId",
-    "code_verifier", "code",
+    "consumer_key",
+    "consumer_secret",
+    "refresh_token",
+    "access_token",
+    "id_token",
+    "username",
+    "password",
+    "tokenId",
+    "authId",
+    "code_verifier",
+    "code",
     # canonical fields we publish ourselves
     "tracking_code",
     "barcode",
@@ -34,23 +43,41 @@ TO_REDACT = {
     "raw_status",
     # carrier payload fields
     "trackingNumber",
-    "ZIP11", "encryptedZIP11", "encryptedPath", "ZIPCode", "ZIPPlus4",
-    "deliveryPoint", "secondaryAddress",
-    "packageId", "packageID", "nickname", "shipperName", "eventCity",
-    "eventState", "eventZIP", "firm", "originZIP", "destinationZIP",
+    "ZIP11",
+    "encryptedZIP11",
+    "encryptedPath",
+    "ZIPCode",
+    "ZIPPlus4",
+    "deliveryPoint",
+    "secondaryAddress",
+    "packageId",
+    "packageID",
+    "nickname",
+    "shipperName",
+    "eventCity",
+    "eventState",
+    "eventZIP",
+    "firm",
+    "originZIP",
+    "destinationZIP",
     "recipient",
     "deliveryAddress",
     "address",
     "postalCode",
     "postal_code",
     "city",
-    "street", "streetAddress",
+    "street",
+    "streetAddress",
     "email",
-    "name", "display_name",
+    "name",
+    "display_name",
     "driver",
     "signature",
-    "text1", "text2",
-    "href", "image_url", "ride_along_url",
+    "text1",
+    "text2",
+    "href",
+    "image_url",
+    "ride_along_url",
 }
 
 

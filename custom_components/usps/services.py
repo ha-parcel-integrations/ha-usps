@@ -4,12 +4,13 @@
 tracked parcel without opening the integration options — so a Lovelace button
 can start tracking a parcel straight from a dashboard.
 """
+
 from __future__ import annotations
 
-import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+import voluptuous as vol
 
 from .config_flow import normalize_tracking_code, valid_tracking_code
 from .const import (
@@ -23,17 +24,34 @@ from .const import (
 SERVICE_TRACK_PARCEL = "track_parcel"
 SERVICE_UNTRACK_PARCEL = "untrack_parcel"
 
-_TRACK_SCHEMA = vol.Schema({vol.Required(CONF_TRACKING_CODE): cv.string, vol.Optional("entry_id"): cv.string})
-_UNTRACK_SCHEMA = vol.Schema({vol.Required(CONF_TRACKING_CODE): cv.string, vol.Optional("entry_id"): cv.string})
+_TRACK_SCHEMA = vol.Schema(
+    {vol.Required(CONF_TRACKING_CODE): cv.string, vol.Optional("entry_id"): cv.string}
+)
+_UNTRACK_SCHEMA = vol.Schema(
+    {vol.Required(CONF_TRACKING_CODE): cv.string, vol.Optional("entry_id"): cv.string}
+)
 
 
 def _resolve_entry(hass: HomeAssistant, entry_id: str | None = None):
     """Resolve only an API Tracking entry; inbox entries are immutable."""
-    entries = [entry for entry in hass.config_entries.async_entries(DOMAIN) if entry.data.get(CONF_SOURCE) == SOURCE_API_TRACKING]
+    entries = [
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_SOURCE) == SOURCE_API_TRACKING
+    ]
     if entry_id:
-        target = next((entry for entry in hass.config_entries.async_entries(DOMAIN) if entry.entry_id == entry_id), None)
+        target = next(
+            (
+                entry
+                for entry in hass.config_entries.async_entries(DOMAIN)
+                if entry.entry_id == entry_id
+            ),
+            None,
+        )
         if target is None or target.data.get(CONF_SOURCE) != SOURCE_API_TRACKING:
-            raise ServiceValidationError("The selected USPS entry does not support parcel management")
+            raise ServiceValidationError(
+                "The selected USPS entry does not support parcel management"
+            )
         return target
     if len(entries) != 1:
         raise ServiceValidationError("Specify an API Tracking USPS entry")

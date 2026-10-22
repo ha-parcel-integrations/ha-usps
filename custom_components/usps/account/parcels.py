@@ -1,9 +1,10 @@
 """Canonical mapping for the Informed Delivery inbox."""
+
 from __future__ import annotations
 
+from datetime import datetime, time, tzinfo
 import logging
 import re
-from datetime import datetime, time, tzinfo
 from typing import Any
 
 from ..api.parcels import NEW_ISSUE_URL, tracking_url
@@ -67,7 +68,11 @@ def _local_day(value: Any, tz: tzinfo, *, end: bool = False) -> str | None:
     if not value:
         return None
     try:
-        return datetime.combine(datetime.fromisoformat(str(value)).date(), time.max if end else time.min, tzinfo=tz).isoformat()
+        return datetime.combine(
+            datetime.fromisoformat(str(value)).date(),
+            time.max if end else time.min,
+            tzinfo=tz,
+        ).isoformat()
     except ValueError:
         return None
 
@@ -96,7 +101,9 @@ def _text2_window(text: Any) -> tuple[time | None, time | None]:
     return None, None
 
 
-def _planned_window(value: Any, text2: Any, tz: tzinfo) -> tuple[str | None, str | None]:
+def _planned_window(
+    value: Any, text2: Any, tz: tzinfo
+) -> tuple[str | None, str | None]:
     start, end = _text2_window(text2)
     if not value or (start is None and end is None):
         return _local_day(value, tz), _local_day(value, tz, end=True)
@@ -123,7 +130,9 @@ def _local_timestamp(value: Any, tz: tzinfo) -> str | None:
     return parsed.isoformat()
 
 
-def normalize_informed_delivery_parcel(raw: dict[str, Any], *, tz: tzinfo) -> dict[str, Any]:
+def normalize_informed_delivery_parcel(
+    raw: dict[str, Any], *, tz: tzinfo
+) -> dict[str, Any]:
     """Normalise a current-state inbox record without inventing history.
 
     Package times are naive and local to the enrolled address, not US Eastern
@@ -136,15 +145,30 @@ def normalize_informed_delivery_parcel(raw: dict[str, Any], *, tz: tzinfo) -> di
     delivered = status is ParcelStatus.DELIVERED
     barcode = raw.get("trackingNumber")
     delivery_date = info.get("deliveryDate") or raw.get("expectedDeliveryDate")
-    planned_from, planned_to = (None, None) if delivered else _planned_window(delivery_date, info.get("text2"), tz)
+    planned_from, planned_to = (
+        (None, None)
+        if delivered
+        else _planned_window(delivery_date, info.get("text2"), tz)
+    )
     return {
-        "carrier": "USPS", "barcode": barcode, "sender": raw.get("shipperName") or None,
-        "receiver": None, "status": status, "raw_status": info.get("status") or category,
+        "carrier": "USPS",
+        "barcode": barcode,
+        "sender": raw.get("shipperName") or None,
+        "receiver": None,
+        "status": status,
+        "raw_status": info.get("status") or category,
         "delivered": delivered,
-        "delivered_at": _local_timestamp(raw.get("eventTimestamp"), tz) if delivered else None,
-        "planned_from": planned_from, "planned_to": planned_to,
-        "pickup": None, "pickup_point": None, "url": tracking_url(barcode),
-        "weight": None, "dimensions": None, "history": None,
+        "delivered_at": _local_timestamp(raw.get("eventTimestamp"), tz)
+        if delivered
+        else None,
+        "planned_from": planned_from,
+        "planned_to": planned_to,
+        "pickup": None,
+        "pickup_point": None,
+        "url": tracking_url(barcode),
+        "weight": None,
+        "dimensions": None,
+        "history": None,
         # Keep the complete source record for downstream debugging and
         # compatibility. Diagnostics applies the source-specific redaction
         # list before any of this can be exported from Home Assistant.

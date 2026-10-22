@@ -1,4 +1,5 @@
 """Restricted ForgeRock/PKCE authentication helpers for Informed Delivery."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,10 +10,10 @@ import json
 import logging
 import re
 import secrets
-import unicodedata
-import uuid
 from typing import Any
+import unicodedata
 from urllib.parse import parse_qs, urlparse
+import uuid
 
 import aiohttp
 
@@ -43,7 +44,9 @@ PUSH_APPROVAL_TIMEOUT_SECONDS = 10.0
 # USPS answers a bad password — and a bad verification code — with HTTP 200
 # and a "do you want to try again?" ConfirmationCallback, not a 401. Offering
 # that retry as a question just loops the journey, so it is an auth failure.
-_REJECTION_PATTERN = re.compile(r"recogni[sz]e|incorrect|invalid|missing|try again", re.IGNORECASE)
+_REJECTION_PATTERN = re.compile(
+    r"recogni[sz]e|incorrect|invalid|missing|try again", re.IGNORECASE
+)
 _PASSWORD_CALLBACKS = {"PasswordCallback", "ValidatedCreatePasswordCallback"}
 _USERNAME_CALLBACKS = {"NameCallback", "ValidatedCreateUsernameCallback"}
 
@@ -132,7 +135,10 @@ async def _read_json(response: aiohttp.ClientResponse, context: str) -> Any:
             context,
             response.status,
         )
-        raise USPSApiError(f"non-JSON response from {context} (HTTP {response.status})", status_code=response.status) from err
+        raise USPSApiError(
+            f"non-JSON response from {context} (HTTP {response.status})",
+            status_code=response.status,
+        ) from err
 
 
 def _polling_wait_ms(callbacks: list[dict[str, Any]]) -> int | None:
@@ -203,16 +209,27 @@ def fill_automatic_callbacks(
             # the journey; fail safely rather than silently treat an unpolled
             # push-approval step as auto-advance.
             if _polling_wait_ms([callback]) is not None:
-                raise USPSAuthError("USPS push-approval MFA requires LoginJourney polling")
+                raise USPSAuthError(
+                    "USPS push-approval MFA requires LoginJourney polling"
+                )
             continue
         elif kind == "DeviceProfileCallback":
             _set_input_value(callback, _device_profile_payload(device_id))
         elif kind == "BooleanAttributeInputCallback":
             # Not required: leave the server's own default untouched, so an
             # optional attribute never outranks the real question beside it.
-            if _output_value(callback, "required") and not _is_answered(callback, answered) and challenge is None:
+            if (
+                _output_value(callback, "required")
+                and not _is_answered(callback, answered)
+                and challenge is None
+            ):
                 challenge = callback
-        elif kind in {"TextInputCallback", "OneTimePasswordCallback", "ChoiceCallback", "ConfirmationCallback"}:
+        elif kind in {
+            "TextInputCallback",
+            "OneTimePasswordCallback",
+            "ChoiceCallback",
+            "ConfirmationCallback",
+        }:
             if not _is_answered(callback, answered) and challenge is None:
                 challenge = callback
         else:
@@ -221,7 +238,9 @@ def fill_automatic_callbacks(
             # Only the callback's type and output field *names* are logged,
             # never any value (a required/consent field could carry PII).
             output_names = [
-                item.get("name") for item in callback.get("output") or [] if isinstance(item, dict)
+                item.get("name")
+                for item in callback.get("output") or []
+                if isinstance(item, dict)
             ]
             _LOGGER.warning(
                 "USPS Informed Delivery login returned an unsupported callback "
@@ -233,14 +252,22 @@ def fill_automatic_callbacks(
             raise USPSAuthError(f"Unsupported USPS login callback: {kind}")
     if challenge is not None:
         prompt = challenge_prompt(callbacks, challenge)
-        _LOGGER.debug("USPS Informed Delivery login: pausing for a %s (prompt=%r)", challenge.get("type"), prompt)
+        _LOGGER.debug(
+            "USPS Informed Delivery login: pausing for a %s (prompt=%r)",
+            challenge.get("type"),
+            prompt,
+        )
         raise JourneyChallenge(challenge, prompt)
 
 
 def _clean_text(raw: Any) -> str:
     """Server text rendered in an HA dialog: no tags, no format/bidi control characters."""
     text = html.unescape(re.sub(r"<[^>]+>", " ", str(raw or "")))
-    visible = "".join(char for char in text if unicodedata.category(char) not in {"Cc", "Cf"} or char.isspace())
+    visible = "".join(
+        char
+        for char in text
+        if unicodedata.category(char) not in {"Cc", "Cf"} or char.isspace()
+    )
     return " ".join(visible.split())
 
 
@@ -273,7 +300,14 @@ def rejection_message(callbacks: list[dict[str, Any]]) -> str | None:
     """Return USPS's rejection text if this round is a "try again?" offer."""
     if not any(cb.get("type") == "ConfirmationCallback" for cb in callbacks):
         return None
-    return next((message for message in _messages(callbacks) if _REJECTION_PATTERN.search(message)), None)
+    return next(
+        (
+            message
+            for message in _messages(callbacks)
+            if _REJECTION_PATTERN.search(message)
+        ),
+        None,
+    )
 
 
 def callback_choices(callback: dict[str, Any]) -> list[str]:
@@ -301,14 +335,23 @@ def answer_challenge(callback: dict[str, Any], answer: str) -> None:
         _set_input_value(callback, answer.strip())
         return
     if kind == "BooleanAttributeInputCallback":
-        _set_input_value(callback, str(answer).strip().lower() in {"1", "true", "yes", "on"})
+        _set_input_value(
+            callback, str(answer).strip().lower() in {"1", "true", "yes", "on"}
+        )
         return
     if kind in {"ChoiceCallback", "ConfirmationCallback"}:
         choices = callback_choices(callback)
         try:
             index = int(answer)
         except ValueError:
-            index = next((item for item, choice in enumerate(choices) if choice.casefold() == answer.casefold()), -1)
+            index = next(
+                (
+                    item
+                    for item, choice in enumerate(choices)
+                    if choice.casefold() == answer.casefold()
+                ),
+                -1,
+            )
         if index < 0 or index >= len(choices):
             raise USPSAuthError("Invalid USPS choice challenge answer")
         _set_input_value(callback, index)
@@ -319,7 +362,11 @@ def answer_challenge(callback: dict[str, Any], answer: str) -> None:
 def pkce_pair() -> tuple[str, str]:
     """Create an S256 verifier/challenge pair without logging either value."""
     verifier = secrets.token_urlsafe(64)
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
+        .rstrip(b"=")
+        .decode()
+    )
     return verifier, challenge
 
 
@@ -361,24 +408,47 @@ def enrolled_addresses(profile: dict[str, Any]) -> list[dict[str, str]]:
         if len(zip11) == 11 and zip11.isdigit():
             result.append({"zip11": zip11})
         else:
-            _LOGGER.warning("USPS Informed Delivery: skipping an enrolled address without a usable 11-digit ZIP")
+            _LOGGER.warning(
+                "USPS Informed Delivery: skipping an enrolled address without a usable 11-digit ZIP"
+            )
     if not result:
-        _LOGGER.debug("USPS Informed Delivery: /userinfo top-level keys=%s", sorted(profile.keys()))
+        _LOGGER.debug(
+            "USPS Informed Delivery: /userinfo top-level keys=%s",
+            sorted(profile.keys()),
+        )
     return result
 
 
-async def exchange_refresh_token(session: aiohttp.ClientSession, refresh_token: str) -> dict[str, Any]:
+async def exchange_refresh_token(
+    session: aiohttp.ClientSession, refresh_token: str
+) -> dict[str, Any]:
     """Refresh a rotating token chain using the public portal client."""
-    payload = {"grant_type": "refresh_token", "client_id": CLIENT_ID, "refresh_token": refresh_token, "redirect_uri": REDIRECT_URI}
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": CLIENT_ID,
+        "refresh_token": refresh_token,
+        "redirect_uri": REDIRECT_URI,
+    }
     async with session.post(f"{AM}/oauth2/access_token", data=payload) as response:
-        _LOGGER.debug("USPS Informed Delivery: POST /oauth2/access_token (refresh) -> HTTP %s", response.status)
+        _LOGGER.debug(
+            "USPS Informed Delivery: POST /oauth2/access_token (refresh) -> HTTP %s",
+            response.status,
+        )
         if response.status == 400:
-            _LOGGER.warning("USPS Informed Delivery: refresh token chain expired (dead chain, HTTP 400) — reauth required")
-            raise USPSAuthError("Informed Delivery refresh chain expired", status_code=400)
+            _LOGGER.warning(
+                "USPS Informed Delivery: refresh token chain expired (dead chain, HTTP 400) — reauth required"
+            )
+            raise USPSAuthError(
+                "Informed Delivery refresh chain expired", status_code=400
+            )
         if response.status != 200:
             raise USPSApiError(f"HTTP {response.status}", status_code=response.status)
         data = await _read_json(response, "/oauth2/access_token (refresh)")
-    if not isinstance(data, dict) or not data.get("access_token") or not data.get("refresh_token"):
+    if (
+        not isinstance(data, dict)
+        or not data.get("access_token")
+        or not data.get("refresh_token")
+    ):
         raise USPSAuthError("invalid refresh response")
     return data
 
@@ -399,7 +469,9 @@ class LoginJourney:
         self._payload: dict[str, Any] = {}
         # Stable per installation: a device profile that changes on every
         # login looks like a new device to USPS and invites extra verification.
-        self._device_id = hashlib.sha256(f"usps:{uuid.getnode()}".encode()).hexdigest()[:32]
+        self._device_id = hashlib.sha256(f"usps:{uuid.getnode()}".encode()).hexdigest()[
+            :32
+        ]
         self.challenges_answered = 0
         self.pending_callback: dict[str, Any] | None = None
         self.pending_prompt = ""
@@ -411,9 +483,13 @@ class LoginJourney:
     async def start(self, username: str, password: str) -> str | None:
         """Begin the journey and return a ``tokenId`` once it completes."""
         async with self._session.get(f"{AM}/json/serverinfo/*") as response:
-            _LOGGER.debug("USPS Informed Delivery: GET /serverinfo -> HTTP %s", response.status)
+            _LOGGER.debug(
+                "USPS Informed Delivery: GET /serverinfo -> HTTP %s", response.status
+            )
             if response.status != 200:
-                raise USPSApiError(f"HTTP {response.status}", status_code=response.status)
+                raise USPSApiError(
+                    f"HTTP {response.status}", status_code=response.status
+                )
             server = await _read_json(response, "/serverinfo")
         self._server = server
         realm = str(server.get("realm", "/alpha")).strip("/")
@@ -450,10 +526,14 @@ class LoginJourney:
         self.pending_prompt = ""
         return await self._advance()
 
-    async def _advance(self, username: str | None = None, password: str | None = None) -> str | None:
+    async def _advance(
+        self, username: str | None = None, password: str | None = None
+    ) -> str | None:
         push_approval_elapsed = 0.0
         for round_number in range(MAX_AUTO_ADVANCE):
-            async with self._session.post(self._endpoint, json=self._payload, headers=self._headers) as response:
+            async with self._session.post(
+                self._endpoint, json=self._payload, headers=self._headers
+            ) as response:
                 _LOGGER.debug(
                     "USPS Informed Delivery: POST /authenticate round %s -> HTTP %s",
                     round_number,
@@ -480,13 +560,20 @@ class LoginJourney:
                         round_number,
                         response.status,
                     )
-                    raise USPSApiError(f"HTTP {response.status}", status_code=response.status)
+                    raise USPSApiError(
+                        f"HTTP {response.status}", status_code=response.status
+                    )
                 journey = await _read_json(response, "/authenticate")
             token_id = journey.get("tokenId") if isinstance(journey, dict) else None
             if token_id:
-                _LOGGER.debug("USPS Informed Delivery: journey completed after %s round(s)", round_number + 1)
+                _LOGGER.debug(
+                    "USPS Informed Delivery: journey completed after %s round(s)",
+                    round_number + 1,
+                )
                 return token_id
-            callbacks = journey.get("callbacks", []) if isinstance(journey, dict) else []
+            callbacks = (
+                journey.get("callbacks", []) if isinstance(journey, dict) else []
+            )
             _LOGGER.debug(
                 "USPS Informed Delivery: journey round %s callbacks: %s messages: %s",
                 round_number,
@@ -502,8 +589,13 @@ class LoginJourney:
                         "approved within %.0fs — giving up",
                         PUSH_APPROVAL_TIMEOUT_SECONDS,
                     )
-                    raise USPSAuthError("USPS push-approval MFA was not approved in time")
-                delay = min(wait_ms / 1000, PUSH_APPROVAL_TIMEOUT_SECONDS - push_approval_elapsed)
+                    raise USPSAuthError(
+                        "USPS push-approval MFA was not approved in time"
+                    )
+                delay = min(
+                    wait_ms / 1000,
+                    PUSH_APPROVAL_TIMEOUT_SECONDS - push_approval_elapsed,
+                )
                 _LOGGER.debug(
                     "USPS Informed Delivery: push-approval MFA pending, waiting %.1fs (%.1fs/%.0fs elapsed)",
                     delay,
@@ -516,10 +608,19 @@ class LoginJourney:
                 # PollingWaitCallback round has nothing to fill.
                 continue
             if (rejection := rejection_message(callbacks)) is not None:
-                _LOGGER.debug("USPS Informed Delivery login: USPS rejected the last submission (%r)", rejection)
+                _LOGGER.debug(
+                    "USPS Informed Delivery login: USPS rejected the last submission (%r)",
+                    rejection,
+                )
                 raise JourneyRejected(rejection)
             try:
-                fill_automatic_callbacks(callbacks, username or "", password or "", self._device_id, self._answered_ids)
+                fill_automatic_callbacks(
+                    callbacks,
+                    username or "",
+                    password or "",
+                    self._device_id,
+                    self._answered_ids,
+                )
             except JourneyChallenge as challenge:
                 self.pending_callback = challenge.callback
                 self.pending_prompt = challenge.prompt
@@ -548,7 +649,10 @@ class LoginJourney:
             cookies={str(self._server.get("cookieName")): token_id},
             allow_redirects=False,
         ) as response:
-            _LOGGER.debug("USPS Informed Delivery: GET /oauth2/authorize -> HTTP %s", response.status)
+            _LOGGER.debug(
+                "USPS Informed Delivery: GET /oauth2/authorize -> HTTP %s",
+                response.status,
+            )
             location = response.headers.get("Location", "")
         code = parse_qs(urlparse(location).query).get("code", [None])[0]
         if not code:
@@ -568,20 +672,36 @@ class LoginJourney:
                 "code_verifier": verifier,
             },
         ) as response:
-            _LOGGER.debug("USPS Informed Delivery: POST /oauth2/access_token (code exchange) -> HTTP %s", response.status)
+            _LOGGER.debug(
+                "USPS Informed Delivery: POST /oauth2/access_token (code exchange) -> HTTP %s",
+                response.status,
+            )
             if response.status != 200:
-                raise USPSApiError(f"HTTP {response.status}", status_code=response.status)
+                raise USPSApiError(
+                    f"HTTP {response.status}", status_code=response.status
+                )
             tokens = await _read_json(response, "/oauth2/access_token (code exchange)")
-        if not isinstance(tokens, dict) or not tokens.get("access_token") or not tokens.get("refresh_token"):
-            _LOGGER.warning("USPS Informed Delivery: token exchange response was missing access/refresh tokens")
+        if (
+            not isinstance(tokens, dict)
+            or not tokens.get("access_token")
+            or not tokens.get("refresh_token")
+        ):
+            _LOGGER.warning(
+                "USPS Informed Delivery: token exchange response was missing access/refresh tokens"
+            )
             raise USPSAuthError("Token exchange failed")
         async with self._session.get(
             f"{AM}/oauth2/userinfo",
             headers={"Authorization": f"Bearer {tokens['access_token']}"},
         ) as response:
-            _LOGGER.debug("USPS Informed Delivery: GET /oauth2/userinfo -> HTTP %s", response.status)
+            _LOGGER.debug(
+                "USPS Informed Delivery: GET /oauth2/userinfo -> HTTP %s",
+                response.status,
+            )
             if response.status != 200:
-                raise USPSApiError(f"HTTP {response.status}", status_code=response.status)
+                raise USPSApiError(
+                    f"HTTP {response.status}", status_code=response.status
+                )
             profile = await _read_json(response, "/oauth2/userinfo")
         _LOGGER.debug(
             "USPS Informed Delivery: /userinfo returned %s address(es)",
@@ -590,7 +710,9 @@ class LoginJourney:
         return tokens, profile
 
 
-async def complete_login(session: aiohttp.ClientSession, username: str, password: str) -> tuple[dict[str, Any], dict[str, Any]]:
+async def complete_login(
+    session: aiohttp.ClientSession, username: str, password: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run a login journey end to end, for the no-challenge happy path.
 
     Interactive MFA callbacks raise :class:`JourneyChallenge`: Home Assistant

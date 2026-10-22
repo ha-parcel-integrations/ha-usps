@@ -7,12 +7,13 @@ key (rotated or revoked outside Home Assistant) is a whole-poll condition, not
 a per-parcel one — it must short-circuit into a reauth prompt rather than being
 folded into the ordinary per-parcel error count below.
 """
+
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -36,11 +37,7 @@ from ..const import (
     STAGGER_MINUTES,
     ParcelStatus,
 )
-from .client import (
-    ApiTrackingClient,
-    USPSApiError,
-    USPSAuthError,
-)
+from .client import ApiTrackingClient, USPSApiError, USPSAuthError
 from .parcels import apply_delivered_filter, normalize_parcel, sort_parcels_by_ts
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,10 +67,9 @@ def _next_anchor(now: datetime) -> datetime:
     )
     if now < six_today:
         return six_today
-    midnight_tomorrow = (now + timedelta(days=1)).replace(
+    return (now + timedelta(days=1)).replace(
         hour=QUIET_WINDOW_START_HOUR, minute=0, second=0, microsecond=0
     )
-    return midnight_tomorrow
 
 
 def _hottest_tier_minutes(active_parcels: list[dict], now: datetime) -> int | None:
@@ -180,9 +176,9 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         # that already existed when the integration started — otherwise every
         # restart would flood users with "registered" notifications.
         self._known_state: dict[str, ParcelStatus] | None = None
-        self._known_delivery_times: (
-            dict[str, tuple[str | None, str | None]] | None
-        ) = None
+        self._known_delivery_times: dict[str, tuple[str | None, str | None]] | None = (
+            None
+        )
         # Cached device id, attached to every fired event so device-trigger
         # automations can filter to this device.
         self._cached_device_id: str | None = None
@@ -226,9 +222,7 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
     def _include_history(self) -> bool:
         """Whether the opt-in per-parcel history option is enabled."""
         return bool(
-            self.config_entry.options.get(
-                CONF_INCLUDE_HISTORY, DEFAULT_INCLUDE_HISTORY
-            )
+            self.config_entry.options.get(CONF_INCLUDE_HISTORY, DEFAULT_INCLUDE_HISTORY)
         )
 
     async def _async_update_data(self) -> list[dict]:
@@ -260,24 +254,21 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         # into the ordinary per-parcel error handling below.
         for result in results:
             if isinstance(result, USPSAuthError):
-                _LOGGER.warning("USPS API Tracking: credentials rejected during poll — starting reauth")
+                _LOGGER.warning(
+                    "USPS API Tracking: credentials rejected during poll — starting reauth"
+                )
                 raise ConfigEntryAuthFailed("USPS API key rejected") from result
 
         raws_by_code: dict[str, dict] = {}
         errors = 0
         retry_afters: list[float] = []
         saw_429 = False
-        for code, result in zip(codes_to_fetch, results):
+        for code, result in zip(codes_to_fetch, results, strict=True):
             if isinstance(result, BaseException):
-                if not isinstance(
-                    result, (USPSApiError, aiohttp.ClientError)
-                ):
+                if not isinstance(result, (USPSApiError, aiohttp.ClientError)):
                     raise result
                 errors += 1
-                if (
-                    isinstance(result, USPSApiError)
-                    and result.status_code == 429
-                ):
+                if isinstance(result, USPSApiError) and result.status_code == 429:
                     saw_429 = True
                     if result.retry_after is not None:
                         retry_afters.append(result.retry_after)
@@ -324,9 +315,7 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
                     BACKOFF_CAP_SECONDS,
                 )
             )
-            raise UpdateFailed(
-                "USPS rate-limited (429)", retry_after=retry_after
-            )
+            raise UpdateFailed("USPS rate-limited (429)", retry_after=retry_after)
         self._consecutive_429 = 0
 
         if codes_to_fetch and errors == len(codes_to_fetch) and not raws_by_code:
@@ -343,7 +332,9 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         # flipped to delivered is skipped starting next cycle; one that
         # somehow un-delivers (should not happen, but the fetch list must
         # never permanently drop a code) rejoins it automatically.
-        self._delivered_codes = {code for code, parcel in entries if parcel["delivered"]}
+        self._delivered_codes = {
+            code for code, parcel in entries if parcel["delivered"]
+        }
 
         self.delivered = apply_delivered_filter(
             sort_parcels_by_ts(delivered, "delivered_at", descending=True),
@@ -370,7 +361,7 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         # succeeded (or nothing needed fetching) — a poll served entirely from
         # cache must not present itself as a successful update.
         if not codes_to_fetch or errors < len(codes_to_fetch):
-            self.last_success_time = datetime.now(timezone.utc)
+            self.last_success_time = datetime.now(UTC)
 
         now = dt_util.now()
         self._current_tier_minutes = _hottest_tier_minutes(normalized_active, now)

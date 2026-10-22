@@ -9,6 +9,7 @@ IPv4 is forced because the host also publishes IPv6 addresses, and on a
 network without a working IPv6 route the connection attempt fails
 intermittently instead of falling back cleanly.
 """
+
 from __future__ import annotations
 
 import socket
@@ -21,6 +22,8 @@ def async_new_informed_delivery_session(hass: HomeAssistant) -> aiohttp.ClientSe
     """Return a new session on its own IPv4-only connector; the caller closes it."""
     return aiohttp.ClientSession(
         connector=aiohttp.TCPConnector(
-            family=socket.AF_INET, resolver=aiohttp.ThreadedResolver(), ttl_dns_cache=300
+            family=socket.AF_INET,
+            resolver=aiohttp.ThreadedResolver(),
+            ttl_dns_cache=300,
         )
     )

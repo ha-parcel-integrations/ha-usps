@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import hashlib
 import logging
 import re
-from collections.abc import Mapping
 from typing import Any
 
 import aiohttp
-import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -19,6 +18,7 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
 
 from .account.auth import (
     JourneyChallenge,
@@ -58,8 +58,12 @@ _LOGGER = logging.getLogger(__name__)
 
 # USPS Business Tracking issues a Consumer Key/Secret pair, exchanged for a
 # client_credentials access token — not a single opaque key.
-_API_SCHEMA = vol.Schema({vol.Required(CONF_CONSUMER_KEY): str, vol.Required(CONF_CONSUMER_SECRET): str})
-_INFORMED_SCHEMA = vol.Schema({vol.Required(CONF_USERNAME): str, vol.Required("password"): str})
+_API_SCHEMA = vol.Schema(
+    {vol.Required(CONF_CONSUMER_KEY): str, vol.Required(CONF_CONSUMER_SECRET): str}
+)
+_INFORMED_SCHEMA = vol.Schema(
+    {vol.Required(CONF_USERNAME): str, vol.Required("password"): str}
+)
 
 # ForgeRock callback classes this flow knows how to render as a challenge
 # form, and how.
@@ -68,7 +72,9 @@ _TEXT_CALLBACKS = {"TextInputCallback", "OneTimePasswordCallback"}
 _BOOLEAN_CALLBACKS = {"BooleanAttributeInputCallback"}
 
 
-def _informed_delivery_auth_error(err: USPSAuthError, after_challenge: bool = False) -> str:
+def _informed_delivery_auth_error(
+    err: USPSAuthError, after_challenge: bool = False
+) -> str:
     """Classify a login-journey ``USPSAuthError`` into a translated error key."""
     if isinstance(err, JourneyRejected) and after_challenge:
         return "invalid_code"
@@ -156,7 +162,9 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
         Uses the HA-managed session: this is a one-shot check, so it does not
         need a dedicated client session.
         """
-        client = ApiTrackingClient(consumer_key, consumer_secret, async_get_clientsession(self.hass))
+        client = ApiTrackingClient(
+            consumer_key, consumer_secret, async_get_clientsession(self.hass)
+        )
         await client.async_validate_credentials()
 
     async def async_step_user(
@@ -167,26 +175,39 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
         USPS tracking is barcode-only — no postcode or other second factor
         pairs with a tracking code on either surface.
         """
-        return self.async_show_menu(step_id="user", menu_options=[SOURCE_API_TRACKING, SOURCE_INFORMED_DELIVERY])
+        return self.async_show_menu(
+            step_id="user", menu_options=[SOURCE_API_TRACKING, SOURCE_INFORMED_DELIVERY]
+        )
 
-    async def async_step_api_tracking(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_api_tracking(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Configure explicit-code API Tracking with the user's own app credentials."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
-                await self._validate(user_input[CONF_CONSUMER_KEY], user_input[CONF_CONSUMER_SECRET])
+                await self._validate(
+                    user_input[CONF_CONSUMER_KEY], user_input[CONF_CONSUMER_SECRET]
+                )
             except TrackingNotEnabledError:
-                _LOGGER.debug("USPS API Tracking setup: credentials valid but Tracking scope is not enabled")
+                _LOGGER.debug(
+                    "USPS API Tracking setup: credentials valid but Tracking scope is not enabled"
+                )
                 errors["base"] = "tracking_not_enabled"
             except USPSAuthError as err:
                 _LOGGER.debug("USPS API Tracking setup: credentials rejected (%s)", err)
                 errors["base"] = "invalid_auth"
             except (USPSApiError, aiohttp.ClientError) as err:
-                _LOGGER.warning("USPS API Tracking setup: could not reach the token endpoint (%s)", err)
+                _LOGGER.warning(
+                    "USPS API Tracking setup: could not reach the token endpoint (%s)",
+                    err,
+                )
                 errors["base"] = "cannot_connect"
             else:
-                account = hashlib.sha256(user_input[CONF_CONSUMER_KEY].encode()).hexdigest()[:12]
+                account = hashlib.sha256(
+                    user_input[CONF_CONSUMER_KEY].encode()
+                ).hexdigest()[:12]
                 await self.async_set_unique_id(f"{SOURCE_API_TRACKING}:{account}")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -239,7 +260,9 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
             "addresses": addresses,
         }
         if getattr(self, "_reauth_source", None) == SOURCE_INFORMED_DELIVERY:
-            return self.async_update_reload_and_abort(self._get_reauth_entry(), data_updates=data)
+            return self.async_update_reload_and_abort(
+                self._get_reauth_entry(), data_updates=data
+            )
         return self.async_create_entry(
             title="USPS Informed Delivery",
             data=data,
@@ -250,7 +273,9 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_informed_delivery(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_informed_delivery(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Authenticate a household login without persisting its password."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -265,25 +290,40 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
             journey = LoginJourney(self._id_session)
             self._id_journey = journey
             try:
-                token_id = await journey.start(user_input[CONF_USERNAME], user_input["password"])
+                token_id = await journey.start(
+                    user_input[CONF_USERNAME], user_input["password"]
+                )
             except JourneyChallenge:
                 return self._async_show_challenge_form(journey)
             except USPSAuthError as err:
                 _LOGGER.debug("USPS Informed Delivery setup: login rejected (%s)", err)
                 errors["base"] = _informed_delivery_auth_error(err)
             except (USPSApiError, aiohttp.ClientError) as err:
-                _LOGGER.warning("USPS Informed Delivery setup: could not reach the login endpoint (%s)", err)
+                _LOGGER.warning(
+                    "USPS Informed Delivery setup: could not reach the login endpoint (%s)",
+                    err,
+                )
                 errors["base"] = "cannot_connect"
             else:
                 try:
                     return await self._async_finish_informed_delivery(token_id)
                 except USPSAuthError as err:
-                    _LOGGER.debug("USPS Informed Delivery setup: token exchange rejected (%s)", err)
+                    _LOGGER.debug(
+                        "USPS Informed Delivery setup: token exchange rejected (%s)",
+                        err,
+                    )
                     errors["base"] = "invalid_auth"
                 except (USPSApiError, aiohttp.ClientError) as err:
-                    _LOGGER.warning("USPS Informed Delivery setup: could not complete token exchange (%s)", err)
+                    _LOGGER.warning(
+                        "USPS Informed Delivery setup: could not complete token exchange (%s)",
+                        err,
+                    )
                     errors["base"] = "cannot_connect"
-        return self.async_show_form(step_id=SOURCE_INFORMED_DELIVERY, data_schema=_INFORMED_SCHEMA, errors=errors)
+        return self.async_show_form(
+            step_id=SOURCE_INFORMED_DELIVERY,
+            data_schema=_INFORMED_SCHEMA,
+            errors=errors,
+        )
 
     def _async_show_challenge_form(
         self, journey: LoginJourney, errors: dict[str, str] | None = None
@@ -320,7 +360,9 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
                         vol.Required("answer"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
                                 options=[
-                                    selector.SelectOptionDict(value=str(index), label=str(choice))
+                                    selector.SelectOptionDict(
+                                        value=str(index), label=str(choice)
+                                    )
                                     for index, choice in enumerate(choices)
                                 ],
                                 mode=selector.SelectSelectorMode.LIST,
@@ -354,25 +396,39 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
         except JourneyChallenge:
             return self._async_show_challenge_form(journey)
         except USPSAuthError as err:
-            _LOGGER.debug("USPS Informed Delivery setup: challenge answer rejected (%s)", err)
+            _LOGGER.debug(
+                "USPS Informed Delivery setup: challenge answer rejected (%s)", err
+            )
             errors["base"] = _informed_delivery_auth_error(err, after_challenge=True)
         except (USPSApiError, aiohttp.ClientError) as err:
-            _LOGGER.warning("USPS Informed Delivery setup: could not reach the login endpoint (%s)", err)
+            _LOGGER.warning(
+                "USPS Informed Delivery setup: could not reach the login endpoint (%s)",
+                err,
+            )
             errors["base"] = "cannot_connect"
         else:
             try:
                 return await self._async_finish_informed_delivery(token_id)
             except USPSAuthError as err:
-                _LOGGER.debug("USPS Informed Delivery setup: token exchange rejected (%s)", err)
+                _LOGGER.debug(
+                    "USPS Informed Delivery setup: token exchange rejected (%s)", err
+                )
                 errors["base"] = "invalid_auth"
             except (USPSApiError, aiohttp.ClientError) as err:
-                _LOGGER.warning("USPS Informed Delivery setup: could not complete token exchange (%s)", err)
+                _LOGGER.warning(
+                    "USPS Informed Delivery setup: could not complete token exchange (%s)",
+                    err,
+                )
                 errors["base"] = "cannot_connect"
         # A ForgeRock journey cannot be resumed after a failed round; only a
         # fresh sign-in gets a new one, so never re-show a challenge with
         # nothing pending behind it.
         self._id_journey = None
-        return self.async_show_form(step_id=SOURCE_INFORMED_DELIVERY, data_schema=_INFORMED_SCHEMA, errors=errors)
+        return self.async_show_form(
+            step_id=SOURCE_INFORMED_DELIVERY,
+            data_schema=_INFORMED_SCHEMA,
+            errors=errors,
+        )
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
@@ -391,7 +447,9 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                await self._validate(user_input[CONF_CONSUMER_KEY], user_input[CONF_CONSUMER_SECRET])
+                await self._validate(
+                    user_input[CONF_CONSUMER_KEY], user_input[CONF_CONSUMER_SECRET]
+                )
             except USPSAuthError:
                 errors["base"] = "invalid_auth"
             except (USPSApiError, aiohttp.ClientError):

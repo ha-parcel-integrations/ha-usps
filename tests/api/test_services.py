@@ -1,6 +1,7 @@
 """Tests that global services cannot mutate the inbox source."""
-import pytest
+
 from homeassistant.exceptions import ServiceValidationError
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.usps.const import (
