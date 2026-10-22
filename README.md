@@ -64,7 +64,12 @@ Scanned letter mail from Informed Delivery is not supported (yet); this integrat
 
 1. In HACS, choose the three-dot menu → **Custom repositories**.
 2. Add `https://github.com/ha-parcel-integrations/ha-usps` as an **Integration**.
-3. Install **USPS** and restart Home Assistant. Until the first release, pick the `main` version.
+3. Install **USPS**. Until the first release, pick the `main` version.
+4. Restart Home Assistant if HACS asks you to.
+
+Or click the button below to open it directly in HACS:
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ha-parcel-integrations&repository=ha-usps&category=integration)
 
 ### Manual
 
@@ -72,7 +77,9 @@ Copy `custom_components/usps` into your `config/custom_components/` folder and r
 
 ## Configuration
 
-Add the integration via **Settings → Devices & Services → Add Integration → USPS**, then choose a source.
+[![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=usps)
+
+Or set it up by hand: add the integration via **Settings → Devices & Services → Add Integration → USPS**, then choose a source.
 
 ### Informed Delivery
 
