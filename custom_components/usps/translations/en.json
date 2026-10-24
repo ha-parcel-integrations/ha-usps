@@ -44,7 +44,8 @@
     },
     "abort": {
       "already_configured": "USPS is already set up.",
-      "reauth_successful": "USPS was reauthenticated successfully."
+      "reauth_successful": "USPS was reauthenticated successfully.",
+      "unique_id_mismatch": "That sign-in is for a different USPS account. Sign in with the account this entry was set up for."
     }
   },
   "options": {

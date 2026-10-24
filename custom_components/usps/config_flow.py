@@ -253,7 +253,6 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
             )
         account = hashlib.sha256(self._id_username.lower().encode()).hexdigest()[:12]
         await self.async_set_unique_id(f"{SOURCE_INFORMED_DELIVERY}:{account}")
-        self._abort_if_unique_id_configured()
         data = {
             CONF_SOURCE: SOURCE_INFORMED_DELIVERY,
             CONF_USERNAME: self._id_username,
@@ -262,9 +261,11 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
             "addresses": addresses,
         }
         if getattr(self, "_reauth_source", None) == SOURCE_INFORMED_DELIVERY:
+            self._abort_if_unique_id_mismatch()
             return self.async_update_reload_and_abort(
                 self._get_reauth_entry(), data_updates=data
             )
+        self._abort_if_unique_id_configured()
         return self.async_create_entry(
             title="USPS Informed Delivery",
             data=data,

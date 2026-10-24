@@ -1,5 +1,6 @@
 """Informed Delivery config-flow tests."""
 
+import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import SOURCE_USER
@@ -425,10 +426,16 @@ async def test_challenge_finish_surfaces_invalid_auth_and_cannot_connect(hass):
         assert result["errors"]["base"] == expected
 
 
+def _informed_unique_id(username: str) -> str:
+    account = hashlib.sha256(username.lower().encode()).hexdigest()[:12]
+    return f"{SOURCE_INFORMED_DELIVERY}:{account}"
+
+
 async def test_reauth_keeps_the_informed_delivery_source(hass):
 
     entry = MockConfigEntry(
         domain=DOMAIN,
+        unique_id=_informed_unique_id("user@example.test"),
         data={
             CONF_SOURCE: SOURCE_INFORMED_DELIVERY,
             "access_token": "old",
@@ -446,3 +453,26 @@ async def test_reauth_keeps_the_informed_delivery_source(hass):
         )
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_SOURCE] == SOURCE_INFORMED_DELIVERY
+
+
+async def test_reauth_with_another_informed_delivery_account_aborts(hass):
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=_informed_unique_id("user@example.test"),
+        data={
+            CONF_SOURCE: SOURCE_INFORMED_DELIVERY,
+            "access_token": "old",
+            CONF_REFRESH_TOKEN: "old-refresh",
+            "addresses": [{"zip11": "12345678901"}],
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reauth_flow(hass)
+    journey = _fake_journey()
+    with patch("custom_components.usps.config_flow.LoginJourney", return_value=journey):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"username": "other@example.test", "password": "secret"}
+        )
+    assert result["reason"] == "unique_id_mismatch"
+    assert entry.data[CONF_REFRESH_TOKEN] == "old-refresh"
