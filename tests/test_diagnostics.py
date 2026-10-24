@@ -52,3 +52,14 @@ async def test_entry_diagnostics_redact_entry_data(hass):
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["entry_data"]["consumer_secret"] == "**REDACTED**"
     assert diagnostics["entry_data"]["refresh_token"] == "**REDACTED**"
+
+
+def test_diagnostics_redact_the_informed_delivery_address():
+    data = {
+        "addresses": [{"zip11": "12345678901"}],
+        "incoming": [{"raw": {"_address_id": "12345678901", "zip11": "1"}}],
+    }
+    redacted = async_redact_data(data, TO_REDACT)
+    assert redacted["addresses"] == "**REDACTED**"
+    assert redacted["incoming"][0]["raw"]["_address_id"] == "**REDACTED**"
+    assert redacted["incoming"][0]["raw"]["zip11"] == "**REDACTED**"

@@ -44,6 +44,9 @@ TO_REDACT = {
     # carrier payload fields
     "trackingNumber",
     "ZIP11",
+    "zip11",
+    "_address_id",
+    "addresses",
     "encryptedZIP11",
     "encryptedPath",
     "ZIPCode",
