@@ -215,12 +215,8 @@ async def test_keepalive_starts_reauth_after_dead_refresh(hass):
         ),
     ):
         coordinator.async_start_keepalive()
-    with patch.object(
-        hass.config_entries.flow, "async_init", new=AsyncMock(return_value={})
-    ) as init:
-        await captured["callback"](None)
-        await hass.async_block_till_done()
-    assert init.called
+    await captured["callback"](None)
+    entry.async_start_reauth.assert_called_once_with(hass)
 
 
 def test_keepalive_interval_stays_inside_refresh_lifetime(hass):

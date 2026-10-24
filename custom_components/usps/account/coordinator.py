@@ -79,16 +79,7 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 self.logger.warning(
                     "USPS Informed Delivery token refresh failed — starting reauth"
                 )
-                self.hass.async_create_task(
-                    self.hass.config_entries.flow.async_init(
-                        DOMAIN,
-                        context={
-                            "source": "reauth",
-                            "entry_id": self.config_entry.entry_id,
-                        },
-                        data=self.config_entry.data,
-                    )
-                )
+                self.config_entry.async_start_reauth(self.hass)
 
         return async_track_time_interval(self.hass, _keepalive, timedelta(minutes=10))
 
