@@ -315,3 +315,120 @@ def test_keepalive_registers_a_ten_minute_unload_callback(hass):
     ) as tracker:
         assert coordinator.async_start_keepalive() is cancel
     assert tracker.call_args.args[2].total_seconds() == 600
+
+
+def _row(code, category, **extra):
+    return {
+        "trackingNumber": code,
+        "deliveryInfo": {"statusCategory": category},
+        **extra,
+    }
+
+
+async def _inbox_coordinator(hass, *polls):
+    entry = MagicMock(entry_id="entry", data={"addresses": [{"zip11": "12345678901"}]})
+    client = AsyncMock()
+    client.async_get_packages.side_effect = list(polls)
+    events = []
+    for name in (
+        "registered",
+        "status_changed",
+        "delivered",
+        "delivery_time_changed",
+    ):
+        hass.bus.async_listen(
+            f"usps_parcel_{name}", lambda event, name=name: events.append(name)
+        )
+    return InformedDeliveryCoordinator(hass, client, entry), events
+
+
+async def test_inbox_events_stay_silent_on_the_first_refresh(hass):
+    coordinator, events = await _inbox_coordinator(
+        hass, [_row("9400", "Out for Delivery")]
+    )
+    assert coordinator.last_success_time is None
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+    assert events == []
+    assert coordinator.last_success_time is not None
+
+
+async def test_inbox_fires_registered_status_changed_and_delivered(hass):
+    coordinator, events = await _inbox_coordinator(
+        hass,
+        [_row("9400", "Out for Delivery")],
+        [_row("9400", "Out for Delivery"), _row("9500", "Out for Delivery")],
+        [_row("9400", "Delivered"), _row("9500", "Out for Delivery")],
+        [_row("9400", "Delivered"), _row("9500", "Out for Delivery")],
+    )
+    for _ in range(4):
+        await coordinator._async_update_data()
+    await hass.async_block_till_done()
+    assert events == ["registered", "delivered"]
+
+
+async def test_inbox_fires_status_changed_when_not_delivered(hass):
+    coordinator, events = await _inbox_coordinator(
+        hass,
+        [_row("9400", "Out for Delivery")],
+        [_row("9400", "In Transit")],
+    )
+    await coordinator._async_update_data()
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+    assert events == ["status_changed"]
+
+
+async def test_inbox_ignores_a_parcel_first_seen_delivered(hass):
+    coordinator, events = await _inbox_coordinator(
+        hass,
+        [_row("9400", "Out for Delivery")],
+        [_row("9400", "Out for Delivery"), _row("9500", "Delivered")],
+    )
+    await coordinator._async_update_data()
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+    assert events == []
+
+
+async def test_inbox_fires_delivery_time_changed(hass):
+    coordinator, events = await _inbox_coordinator(
+        hass,
+        [_row("9400", "Out for Delivery")],
+        [_row("9400", "Out for Delivery")],
+    )
+    await coordinator._async_update_data()
+    with patch(
+        "custom_components.usps.account.coordinator.normalize_informed_delivery_parcel",
+        side_effect=lambda row, **_: {
+            "barcode": "9400",
+            "status": "out_for_delivery",
+            "delivered": False,
+            "planned_from": "2026-10-25T09:00:00+00:00",
+            "planned_to": "2026-10-25T17:00:00+00:00",
+        },
+    ):
+        await coordinator._async_update_data()
+    await hass.async_block_till_done()
+    assert events == ["delivery_time_changed"]
+
+
+async def test_inbox_failure_keeps_the_previous_success_time(hass):
+    coordinator, _ = await _inbox_coordinator(
+        hass, [_row("9400", "In Transit")], USPSApiError("HTTP 500")
+    )
+    await coordinator._async_update_data()
+    stamped = coordinator.last_success_time
+    await coordinator._async_update_data()
+    assert coordinator.last_success_time == stamped
+
+
+async def test_inbox_events_carry_the_device_id(hass):
+    coordinator, _ = await _inbox_coordinator(hass, [_row("9400", "In Transit")])
+    device = MagicMock(id="device-1")
+    with patch(
+        "custom_components.usps.account.coordinator.dr.async_entries_for_config_entry",
+        return_value=[device],
+    ):
+        assert coordinator._device_id() == "device-1"
+        assert coordinator._device_id() == "device-1"

@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from ..api.client import USPSApiError, USPSAuthError
-from ..const import DOMAIN
+from ..const import DOMAIN, ParcelStatus
 from .client import InformedDeliveryClient, InformedDeliveryTokenExpired
 from .parcels import normalize_informed_delivery_parcel
 
@@ -48,7 +49,14 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         self._delivered_codes: set[str] = set()
         self._refresh_lock = asyncio.Lock()
         self._last_good: list[dict[str, Any]] = []
-        self.last_success_time = None
+        # ``None`` until the first refresh so a restart does not flood users
+        # with "registered" events for parcels that were already there.
+        self._known_state: dict[str, ParcelStatus] | None = None
+        self._known_delivery_times: dict[str, tuple[str | None, str | None]] | None = (
+            None
+        )
+        self._cached_device_id: str | None = None
+        self.last_success_time: datetime | None = None
 
     @property
     def current_tier_minutes(self) -> int:
@@ -59,6 +67,83 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     def delivered_codes(self) -> set[str]:
         """Return the delivered codes for diagnostics compatibility."""
         return self._delivered_codes
+
+    def _device_id(self) -> str | None:
+        """Resolve (and cache) this entry's device id for event payloads."""
+        if self._cached_device_id is not None:
+            return self._cached_device_id
+        registry = dr.async_get(self.hass)
+        device = next(
+            iter(
+                dr.async_entries_for_config_entry(registry, self.config_entry.entry_id)
+            ),
+            None,
+        )
+        if device is not None:
+            self._cached_device_id = device.id
+        return self._cached_device_id
+
+    def _fire_change_events(self, parcels: list[dict[str, Any]]) -> None:
+        """Fire registered / status-changed / delivered / delivery-time events.
+
+        Same contract as the API Tracking coordinator: silent on the first
+        refresh, the hop to ``delivered`` fires only ``_parcel_delivered``, a
+        barcode first seen already delivered fires nothing, and an ETA going
+        ``value → null`` stays silent.
+        """
+        if self._known_state is None:
+            return
+
+        known_times = self._known_delivery_times or {}
+        device_id = self._device_id()
+
+        for parcel in parcels:
+            barcode = parcel.get("barcode")
+            if not barcode:
+                continue
+            new_status = parcel["status"]
+            if barcode not in self._known_state:
+                if new_status != ParcelStatus.DELIVERED:
+                    self.hass.bus.async_fire(
+                        f"{DOMAIN}_parcel_registered",
+                        {**parcel, "device_id": device_id},
+                    )
+                continue
+
+            if self._known_state[barcode] != new_status:
+                if new_status == ParcelStatus.DELIVERED:
+                    self.hass.bus.async_fire(
+                        f"{DOMAIN}_parcel_delivered",
+                        {**parcel, "device_id": device_id},
+                    )
+                else:
+                    self.hass.bus.async_fire(
+                        f"{DOMAIN}_parcel_status_changed",
+                        {
+                            **parcel,
+                            "device_id": device_id,
+                            "old_status": self._known_state[barcode],
+                            "new_status": new_status,
+                        },
+                    )
+
+            old_from, old_to = known_times.get(barcode, (None, None))
+            new_from = parcel.get("planned_from")
+            new_to = parcel.get("planned_to")
+            if (new_from is not None and new_from != old_from) or (
+                new_to is not None and new_to != old_to
+            ):
+                self.hass.bus.async_fire(
+                    f"{DOMAIN}_parcel_delivery_time_changed",
+                    {
+                        **parcel,
+                        "device_id": device_id,
+                        "old_planned_from": old_from,
+                        "new_planned_from": new_from,
+                        "old_planned_to": old_to,
+                        "new_planned_to": new_to,
+                    },
+                )
 
     def async_start_keepalive(self) -> Callable[[], None]:
         """Refresh the rotating token chain independently of inbox polling."""
@@ -141,6 +226,18 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             )
         self.delivered = [parcel for parcel in parcels if parcel["delivered"]]
         self._last_good = [parcel for parcel in parcels if not parcel["delivered"]]
+        self._fire_change_events(self._last_good + self.delivered)
+        self._known_state = {
+            parcel["barcode"]: parcel["status"]
+            for parcel in parcels
+            if parcel.get("barcode")
+        }
+        self._known_delivery_times = {
+            parcel["barcode"]: (parcel.get("planned_from"), parcel.get("planned_to"))
+            for parcel in parcels
+            if parcel.get("barcode")
+        }
+        self.last_success_time = datetime.now(UTC)
         _LOGGER.debug(
             "USPS Informed Delivery: poll returned %s active, %s delivered parcel(s)",
             len(self._last_good),
