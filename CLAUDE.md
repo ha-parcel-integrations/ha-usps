@@ -50,7 +50,7 @@ Key/Secret and caches only its access token in memory. It follows user-entered
 codes and therefore owns the parcel editor and global services.
 
 Informed Delivery stores no password. It stores the rotating refresh token and
-the current access token, discovers packages only from RMIN-enrolled addresses,
+the current access token, discovers packages and mail only from RMIN-enrolled addresses,
 and never accepts manual parcel mutation. Its five-minute access token and
 fifteen-minute rotating refresh chain require a ten-minute runtime cadence;
 after a sufficiently long Home Assistant outage it must reauthenticate.

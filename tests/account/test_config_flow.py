@@ -453,6 +453,9 @@ async def test_reauth_keeps_the_informed_delivery_source(hass):
         )
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_SOURCE] == SOURCE_INFORMED_DELIVERY
+    # Same reason as the API Tracking reauth test: let the reload and the
+    # delayed store write this schedules finish inside the test.
+    await hass.async_block_till_done()
 
 
 async def test_reauth_with_another_informed_delivery_account_aborts(hass):

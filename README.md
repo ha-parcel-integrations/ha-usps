@@ -25,6 +25,7 @@ Each config entry uses one source; you can add both.
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Options](#options)
+- [Dynamic polling](#dynamic-polling)
 - [Removal](#removal)
 - [Sensors](#sensors)
 - [Letter mail](#letter-mail)
@@ -58,7 +59,7 @@ Each config entry uses one source; you can add both.
 - Informed Delivery: a USPS account with at least one address enrolled at [informeddelivery.usps.com](https://informeddelivery.usps.com)
 - API Tracking: an app on the [USPS developer portal](https://developers.usps.com) with the Tracking API added, and its Consumer Key and Consumer Secret
 
-Scanned letter mail from Informed Delivery is not supported (yet); this integration covers packages only.
+Informed Delivery covers both packages and [scanned letter mail](#letter-mail). Sending parcels is not supported.
 
 ## Installation
 
@@ -150,6 +151,7 @@ Standard HA removal applies: **Settings → Devices & Services → USPS → ⋮ 
 | `sensor.usps_next_delivery` | Earliest expected delivery moment across all active parcels |
 | `sensor.usps_awaiting_pickup` | Parcels held at a post office or ready for pickup; list under the `parcels` attribute |
 | `sensor.usps_delivered_parcels` | Recently delivered parcels (see the retention option) |
+| `sensor.usps_letters` | Informed Delivery only: announced letter mail — see [Letter mail](#letter-mail) |
 | `sensor.usps_last_successful_update` | Diagnostic: when USPS was last polled successfully |
 
 A delivered parcel moves from its per-parcel sensor to the delivered sensor automatically.
@@ -165,7 +167,7 @@ Informed Delivery scans the outside of the letter mail on its way to your addres
 
 Today and yesterday are both checked, because USPS posts the day's mail in a morning batch — before it lands, "no mail yet" and "no mail today" look the same. Mail rides along with the parcel poll; there is no separate interval. A piece that drops out of the feed takes its image entity with it.
 
-Not every piece has a sender: USPS only names one for branded mail, so the rest are listed by their own identifier. A piece without a scan is still counted, it just gets no image.
+Not every piece has a sender — USPS does not name one for every scan — so a piece without one is listed under its own identifier instead. A piece without a scan is still counted, it just gets no image.
 
 > **This feed has not been confirmed against a real account yet.** If your letters sensor stays at 0 while [informeddelivery.usps.com](https://informeddelivery.usps.com) shows mail, turn on [debug logging](#debugging) — the integration writes an explicit warning describing what it received, and that warning is exactly what we need in an issue.
 
@@ -239,6 +241,7 @@ The log never contains passwords, keys or tokens, and addresses are only logged 
 - **"No address on this USPS account is enrolled in Informed Delivery"** — sign-in worked, but the account has no enrolled address. Enroll one at [informeddelivery.usps.com](https://informeddelivery.usps.com) first.
 - **"USPS did not accept that verification code"** — the passcode was wrong or expired. Sign in again to receive a new one.
 - **Informed Delivery asks to sign in again** — the session expired, usually after Home Assistant was offline for a while. This cannot be renewed without you, because USPS asks for a passcode. A normal restart should not ask: the session is renewed as Home Assistant starts.
+- **The letters sensor stays at 0** — if [informeddelivery.usps.com](https://informeddelivery.usps.com) shows mail for today and this does not, enable debug logging: the integration logs a warning naming exactly what USPS sent back. That line is what an issue needs. A day genuinely without mail is `0` with no warning at all.
 - **"These credentials do not have the USPS Tracking product enabled"** — add the Tracking API to your app on the USPS developer portal.
 - **"Could not reach USPS"** — a network problem or a temporary USPS outage. Try again later; if it keeps happening, attach a debug log to an issue.
 

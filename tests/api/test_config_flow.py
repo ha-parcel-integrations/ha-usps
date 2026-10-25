@@ -42,6 +42,10 @@ async def test_api_tracking_reauth_updates_only_api_credentials(hass):
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_CONSUMER_KEY] == "new"
     assert entry.data[CONF_SOURCE] == SOURCE_API_TRACKING
+    # A successful reauth updates the entry, which schedules both a reload and
+    # a delayed write of the config-entry store. Let them finish inside the
+    # test rather than leaving a timer behind for whatever runs next.
+    await hass.async_block_till_done()
 
 
 async def test_reauth_confirm_surfaces_invalid_auth(hass):
