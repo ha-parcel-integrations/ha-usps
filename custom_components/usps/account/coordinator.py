@@ -8,16 +8,17 @@ from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from ..api.client import USPSApiError, USPSAuthError
-from ..const import DOMAIN, ParcelStatus
+from ..const import CONF_REFRESH_TOKEN, DOMAIN, ParcelStatus
 from .client import InformedDeliveryClient, InformedDeliveryTokenExpired
 from .parcels import normalize_informed_delivery_parcel
 
@@ -145,6 +146,40 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                     },
                 )
 
+    def _persist_tokens(self) -> None:
+        """Write the current token pair back to the entry.
+
+        Both halves matter: the access token stored at login is dead five
+        minutes later, so an entry that only ever persisted the refresh token
+        came back from a restart with a token USPS was certain to reject.
+        """
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            data={
+                **self.config_entry.data,
+                "access_token": self._client.access_token,
+                CONF_REFRESH_TOKEN: self._client.refresh_token,
+            },
+        )
+
+    async def async_restore_session(self) -> None:
+        """Renew the stored chain before the first poll after a restart.
+
+        Starting that poll on the stored access token would make every
+        restart depend on USPS naming the expiry in its 401 body; a chain
+        that is genuinely dead still surfaces here as reauth.
+        """
+        try:
+            async with self._refresh_lock:
+                await self._client.async_refresh()
+                self._persist_tokens()
+        except USPSAuthError as err:
+            raise ConfigEntryAuthFailed(
+                "Informed Delivery requires reauthentication"
+            ) from err
+        except (USPSApiError, aiohttp.ClientError, TimeoutError) as err:
+            raise ConfigEntryNotReady(str(err)) from err
+
     def async_start_keepalive(self) -> Callable[[], None]:
         """Refresh the rotating token chain independently of inbox polling."""
 
@@ -153,13 +188,7 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             try:
                 async with self._refresh_lock:
                     await self._client.async_refresh()
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry,
-                        data={
-                            **self.config_entry.data,
-                            "refresh_token": self._client.refresh_token,
-                        },
-                    )
+                    self._persist_tokens()
             except USPSAuthError:
                 self.logger.warning(
                     "USPS Informed Delivery token refresh failed — starting reauth"
@@ -184,13 +213,7 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 async with self._refresh_lock:
                     if self._client.refresh_generation == generation:
                         await self._client.async_refresh()
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry,
-                        data={
-                            **self.config_entry.data,
-                            "refresh_token": self._client.refresh_token,
-                        },
-                    )
+                    self._persist_tokens()
                 rows = []
                 for address in addresses:
                     rows.extend(await self._client.async_get_packages(address["zip11"]))

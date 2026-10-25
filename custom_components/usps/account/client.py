@@ -43,6 +43,11 @@ class InformedDeliveryClient:
         self._session = session
 
     @property
+    def access_token(self) -> str:
+        """Return the current access token for persistence alongside the chain."""
+        return self._access_token
+
+    @property
     def refresh_token(self) -> str:
         """Return the latest rotated refresh token for atomic persistence."""
         return self._refresh_token

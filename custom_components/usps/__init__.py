@@ -76,6 +76,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     else:
         raise ValueError("USPS entry has no supported source")
 
+    if isinstance(coordinator, InformedDeliveryCoordinator):
+        # The access token in the entry expired five minutes after it was
+        # written, so renew the chain before the first poll rather than let
+        # that poll's 401 decide whether this is an expiry or a revocation.
+        await coordinator.async_restore_session()
+
     # Fetch initial data here, before forwarding to platforms. Raising
     # ConfigEntryNotReady from a forwarded platform is too late for HA to catch
     # cleanly (it logs a warning and half-sets-up the entry); doing the first

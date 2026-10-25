@@ -54,6 +54,11 @@ the current access token, discovers packages only from RMIN-enrolled addresses,
 and never accepts manual parcel mutation. Its five-minute access token and
 fifteen-minute rotating refresh chain require a ten-minute runtime cadence;
 after a sufficiently long Home Assistant outage it must reauthenticate.
+Every refresh persists **both** tokens, and setup renews the chain
+(`async_restore_session`) before the first poll: the stored access token is
+five minutes old at best, so a restart that polls on it leaves "expired or
+revoked?" to USPS's 401 body, and a normal restart then reads as a dead
+session.
 
 Informed Delivery sign-in tripwires, each found against a real account:
 - **Own connector.** `account/session.py` builds its own IPv4

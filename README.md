@@ -220,7 +220,7 @@ The log never contains passwords, keys or tokens, and addresses are only logged 
 - **A status logs "Unrecognised USPS status"** — please [open an issue](https://github.com/ha-parcel-integrations/ha-usps/issues/new?template=unrecognised_status.yml) with the logged line so the mapping can be extended.
 - **"No address on this USPS account is enrolled in Informed Delivery"** — sign-in worked, but the account has no enrolled address. Enroll one at [informeddelivery.usps.com](https://informeddelivery.usps.com) first.
 - **"USPS did not accept that verification code"** — the passcode was wrong or expired. Sign in again to receive a new one.
-- **Informed Delivery asks to sign in again** — the session expired, usually after Home Assistant was offline for a while. This cannot be renewed without you, because USPS asks for a passcode.
+- **Informed Delivery asks to sign in again** — the session expired, usually after Home Assistant was offline for a while. This cannot be renewed without you, because USPS asks for a passcode. A normal restart should not ask: the session is renewed as Home Assistant starts.
 - **"These credentials do not have the USPS Tracking product enabled"** — add the Tracking API to your app on the USPS developer portal.
 - **"Could not reach USPS"** — a network problem or a temporary USPS outage. Try again later; if it keeps happening, attach a debug log to an issue.
 
