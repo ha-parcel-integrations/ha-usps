@@ -157,7 +157,7 @@ class USPSLetterImage(CoordinatorEntity[InformedDeliveryCoordinator], ImageEntit
             "date": letter.get("date"),
             "piece_type": letter.get("piece_type"),
             "barcode": letter.get("barcode"),
-            "campaign": letter.get("campaign"),
+            "campaign_mailer": letter.get("campaign_mailer"),
             "campaign_url": letter.get("campaign_url"),
         }
 

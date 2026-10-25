@@ -169,6 +169,8 @@ Today and yesterday are both checked, because USPS posts the day's mail in a mor
 
 Not every piece has a sender — USPS does not name one for every scan — so a piece without one is listed under its own identifier instead. A piece without a scan is still counted, it just gets no image.
 
+**⋮ → Download diagnostics** includes the announced mail with every identifying value replaced by `**REDACTED**` — senders, mailpiece ids, barcodes and scan links all go. What stays is the shape of USPS's answer, which is exactly what an issue about missing mail needs, so it is safe to attach.
+
 > **This feed has not been confirmed against a real account yet.** If your letters sensor stays at 0 while [informeddelivery.usps.com](https://informeddelivery.usps.com) shows mail, turn on [debug logging](#debugging) — the integration writes an explicit warning describing what it received, and that warning is exactly what we need in an issue.
 
 ## Parcel status reference

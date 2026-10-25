@@ -31,7 +31,7 @@ def test_a_plain_scan_becomes_a_letter():
     assert letter["image_name"] == "scan_1"
     assert letter["date"] == "2026-10-25"
     assert letter["sender"] is None
-    assert letter["campaign"] is None
+    assert letter["campaign_mailer"] is None
 
 
 def test_the_response_date_wins_over_the_requested_one():
@@ -96,7 +96,7 @@ def test_a_campaign_contributes_its_ride_along_and_replacement_image():
         requested_date="2026-10-25",
     )
     assert letter["image_url"] == "/images/campaign_2.png"
-    assert letter["campaign"] == "Example Bank"
+    assert letter["campaign_mailer"] == "Example Bank"
     assert letter["campaign_url"] == "https://example.invalid/offer"
 
 

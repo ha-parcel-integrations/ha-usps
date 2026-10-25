@@ -191,7 +191,7 @@ def _parse_piece(piece: dict[str, Any], *, date: str | None) -> dict[str, Any] |
         "image_name": _image_name(piece, raw_image),
         "piece_type": piece.get("pieceType") or None,
         "barcode": piece.get("IMB") or None,
-        "campaign": campaign.get("mailerName") if campaign else None,
+        "campaign_mailer": campaign.get("mailerName") if campaign else None,
         "campaign_url": _ride_along_url(campaign) if campaign else None,
         # The full record, like every parcel's ``raw``. Diagnostics redacts it.
         "raw": piece,

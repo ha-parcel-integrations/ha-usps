@@ -92,6 +92,7 @@ TO_REDACT = {
     "MID",
     "senderName",
     "mailerName",
+    "campaign_mailer",
     "campaign_url",
 }
 

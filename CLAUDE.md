@@ -99,6 +99,13 @@ placeholder and is skipped; `senderName`/`MID` on the piece win over
 simplify any of these to one source's version** until a real capture settles
 it — see `carrier-research/usps/api/informed-delivery.md`.
 
+Diagnostics carry the letters list, redacted. Keys survive redaction and the
+values do not, which is the whole point: a tester can paste diagnostics into a
+public issue and it still settles which field names USPS really sends. That is
+why the derived campaign mailer is called `campaign_mailer`, not `campaign` —
+redacting a key named `campaign` would blank raw's entire campaign object and
+take the field names with it.
+
 Scan bytes are fetched server-side and served through HA's authenticated image
 proxy, never as a redirect: the image URL needs the bearer token. The fetch
 goes through `coordinator.async_get_letter_image`, which refreshes the
