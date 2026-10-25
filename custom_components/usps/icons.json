@@ -28,6 +28,14 @@
       },
       "parcel": {
         "default": "mdi:package-variant-closed"
+      },
+      "letters": {
+        "default": "mdi:mailbox"
+      }
+    },
+    "image": {
+      "letter_image": {
+        "default": "mdi:email-outline"
       }
     }
   }

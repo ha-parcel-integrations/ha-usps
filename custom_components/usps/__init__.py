@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -20,6 +21,7 @@ from .const import (
     CONF_CONSUMER_SECRET,
     CONF_REFRESH_TOKEN,
     CONF_SOURCE,
+    INFORMED_DELIVERY_PLATFORMS,
     PLATFORMS,
     SOURCE_API_TRACKING,
     SOURCE_INFORMED_DELIVERY,
@@ -40,6 +42,13 @@ class USPSData:
 
 
 type USPSConfigEntry = ConfigEntry[USPSData]
+
+
+def _platforms(entry: ConfigEntry) -> list[Platform]:
+    """Return the platforms this entry's source actually populates."""
+    if entry.data.get(CONF_SOURCE) == SOURCE_INFORMED_DELIVERY:
+        return INFORMED_DELIVERY_PLATFORMS
+    return PLATFORMS
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool:
@@ -94,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     if isinstance(coordinator, InformedDeliveryCoordinator):
         entry.async_on_unload(coordinator.async_start_keepalive())
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, _platforms(entry))
 
     # Apply option changes (added/removed parcels, history) live via a
     # coordinator refresh — no reload — so per-parcel sensors appear and
@@ -116,7 +125,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: USPSConfigEntry) ->
 
 async def async_unload_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool:
     """Unload the USPS config entry."""
-    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+    if not await hass.config_entries.async_unload_platforms(entry, _platforms(entry)):
         return False
     if not any(
         other.data.get(CONF_SOURCE) == SOURCE_API_TRACKING

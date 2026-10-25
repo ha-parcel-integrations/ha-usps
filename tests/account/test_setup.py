@@ -41,6 +41,10 @@ async def test_informed_delivery_setup_exposes_inbox_entities(hass):
             ),
         ),
         patch(
+            "custom_components.usps.account.client.InformedDeliveryClient.async_get_mail_pieces",
+            new=AsyncMock(return_value={"mailpieces": []}),
+        ),
+        patch(
             "custom_components.usps.account.client.InformedDeliveryClient.async_get_packages",
             new=AsyncMock(return_value=[package]),
         ),
@@ -72,6 +76,10 @@ async def test_setup_renews_the_token_chain_before_the_first_poll(hass):
                 return_value={"access_token": "fresh", "refresh_token": "rotated"}
             ),
         ) as refresh,
+        patch(
+            "custom_components.usps.account.client.InformedDeliveryClient.async_get_mail_pieces",
+            new=AsyncMock(return_value={"mailpieces": []}),
+        ),
         patch(
             "custom_components.usps.account.client.InformedDeliveryClient.async_get_packages",
             new=AsyncMock(return_value=[]),

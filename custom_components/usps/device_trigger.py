@@ -23,6 +23,8 @@ TRIGGER_EVENTS = {
     "parcel_status_changed": f"{DOMAIN}_parcel_status_changed",
     "parcel_delivered": f"{DOMAIN}_parcel_delivered",
     "parcel_delivery_time_changed": f"{DOMAIN}_parcel_delivery_time_changed",
+    # Informed Delivery only; an API Tracking device never fires it.
+    "letter_announced": f"{DOMAIN}_letter_announced",
 }
 TRIGGER_TYPES = set(TRIGGER_EVENTS)
 
@@ -34,7 +36,7 @@ TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
 async def async_get_triggers(
     hass: HomeAssistant, device_id: str
 ) -> list[dict[str, str]]:
-    """Return the list of parcel triggers for an USPS device."""
+    """Return the list of parcel and letter triggers for an USPS device."""
     return [
         {
             CONF_PLATFORM: "device",

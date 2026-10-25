@@ -76,8 +76,36 @@ Informed Delivery sign-in tripwires, each found against a real account:
 - `ChoiceCallback` choices are the output named `choices`,
   `ConfirmationCallback`'s the one named `options`; `waitTime` is a string.
 
-Scanned letter mail is not implemented; the integration covers packages only.
-Outgoing parcels are not supported yet either.
+Scanned letter mail **is** implemented, on the account source only: a
+`letters` sensor plus one `image` entity per scanned piece, a
+`usps_letter_announced` event and its device trigger. It rides along with the
+parcel poll — no separate cadence — and queries today *and* yesterday
+(Eastern), unioned by `mailpieceID`, because before the morning batch posts
+"no mail yet today" and "no mail today" are indistinguishable. `Platform.IMAGE`
+is forwarded **only** for an Informed Delivery entry (`INFORMED_DELIVERY_PLATFORMS`):
+forwarding it for API Tracking sets up a platform that can never hold an
+entity, and leaks HA's image-token timer into the test suite.
+
+**The mail payload has never been seen from a real account.** Its field names
+come from two third-party readings that disagree in places, so `letters.py`
+treats everything as optional, never raises, and warns once per session —
+with the response's actual keys — whenever anything is missing or unknown.
+That logging is the feature: it is how a wrong field name reports itself from
+a user's log instead of showing an empty sensor. Decisions already taken from
+that disagreement: `mailpieceID == "singleBlueBox"` is USPS's no-mail
+placeholder and is skipped; `senderName`/`MID` on the piece win over
+`campaign.mailerName`; the response's own `date` wins over the requested one;
+`imageName` is read both on the piece and inside its image object. **Don't
+simplify any of these to one source's version** until a real capture settles
+it — see `carrier-research/usps/api/informed-delivery.md`.
+
+Scan bytes are fetched server-side and served through HA's authenticated image
+proxy, never as a redirect: the image URL needs the bearer token. The fetch
+goes through `coordinator.async_get_letter_image`, which refreshes the
+five-minute access token once on a 401 — an image can be rendered long after
+the poll that discovered it.
+
+Outgoing parcels are not supported.
 
 Both sources deliberately return `None` for weight, dimensions and pickup
 point data. API Tracking alone can expose structured history; Informed Delivery
@@ -230,7 +258,8 @@ repo's own `CLAUDE.md` — not a generator flag.
 | File | Carrier-specific? |
 |---|---|
 | `api/` (credentialed API client, coordinator, normalizer and error types) | **yes** |
-| `account/` (account auth, client, coordinator and normalizer) | **yes** |
+| `account/` (account auth, client, coordinator, normalizer and `letters.py`) | **yes** |
+| `image.py` (letter scans; no-ops on an API Tracking entry) | no |
 | `const.py` (domain, URLs, `ParcelStatus`, option keys) | partly (URLs) |
 | `parcels.py` (status map, `normalize_parcel`, history, sort, filters — pure, no I/O) | partly (the status map, `normalize_parcel`) |
 | `coordinator.py` (fetch, cache, event firing) | mostly not |

@@ -81,6 +81,18 @@ TO_REDACT = {
     "href",
     "image_url",
     "ride_along_url",
+    # letter mail: a mailpiece id, its scan name and its barcode all identify
+    # one envelope delivered to this address, and the sender names say who
+    # writes to this household.
+    "id",
+    "mailpieceID",
+    "imageName",
+    "image_name",
+    "IMB",
+    "MID",
+    "senderName",
+    "mailerName",
+    "campaign_url",
 }
 
 
@@ -97,6 +109,7 @@ async def async_get_config_entry_diagnostics(
             "incoming_active": len(coordinator.data or []),
             "delivered": len(coordinator.delivered or []),
             "skipped_from_fetch": len(coordinator.delivered_codes),
+            "letters": len(getattr(coordinator, "letters", None) or []),
         },
         "polling": {
             "tier_minutes": coordinator.current_tier_minutes,
@@ -109,4 +122,7 @@ async def async_get_config_entry_diagnostics(
         },
         "incoming": async_redact_data(coordinator.data or [], TO_REDACT),
         "delivered": async_redact_data(coordinator.delivered or [], TO_REDACT),
+        "letters": async_redact_data(
+            getattr(coordinator, "letters", None) or [], TO_REDACT
+        ),
     }

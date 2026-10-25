@@ -56,6 +56,7 @@ async def async_setup_entry(
         f"{entry_id}_awaiting_pickup",
         f"{entry_id}_delivered_parcels",
         f"{entry_id}_last_update",
+        f"{entry_id}_letters",
     }
     for entity_entry in er.async_entries_for_config_entry(registry, entry_id):
         if (
@@ -80,6 +81,8 @@ async def async_setup_entry(
     entities.append(USPSAwaitingPickupSensor(coordinator, entry))
     entities.append(USPSDeliveredParcelsSensor(coordinator, entry))
     entities.append(USPSLastUpdateSensor(coordinator, entry))
+    if hasattr(coordinator, "letters"):
+        entities.append(USPSLettersSensor(coordinator, entry))
 
     async_add_entities(entities)
 
@@ -291,6 +294,43 @@ class USPSDeliveredParcelsSensor(CoordinatorEntity[USPSCoordinator], SensorEntit
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the extra state attributes."""
         return {"parcels": self.coordinator.delivered}
+
+
+class USPSLettersSensor(CoordinatorEntity[USPSCoordinator], SensorEntity):
+    """Count of scanned letter mail Informed Delivery announced for today.
+
+    Informed Delivery only; the API Tracking source has no mail feed, so this
+    sensor is not created for those entries.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "letters"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_attribution = ATTRIBUTION
+    _unrecorded_attributes = frozenset({"letters"})
+
+    def __init__(self, coordinator: USPSCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_letters"
+        self._attr_device_info = build_device_info(entry)
+
+    @property
+    def _letters(self) -> list[dict[str, Any]]:
+        return getattr(self.coordinator, "letters", None) or []
+
+    @property
+    def native_value(self) -> int:
+        """Return the native value of the sensor."""
+        return len(self._letters)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the extra state attributes."""
+        return {
+            "with_scan": sum(1 for letter in self._letters if letter.get("image_url")),
+            "letters": self._letters,
+        }
 
 
 class USPSLastUpdateSensor(CoordinatorEntity[USPSCoordinator], SensorEntity):

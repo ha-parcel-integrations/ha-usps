@@ -5,17 +5,25 @@
       "api_tracking": {
         "title": "USPS API Tracking instellen",
         "description": "Voer de Consumer Key en Consumer Secret in van je USPS-app met Tracking.",
-        "data": {"consumer_key": "Consumer Key", "consumer_secret": "Consumer Secret"}
+        "data": {
+          "consumer_key": "Consumer Key",
+          "consumer_secret": "Consumer Secret"
+        }
       },
       "informed_delivery": {
         "title": "USPS Informed Delivery instellen",
         "description": "Meld je aan met het USPS-account dat is ingeschreven voor Informed Delivery. Opnieuw verifiëren kan MFA vereisen.",
-        "data": {"username": "USPS-gebruikersnaam of e-mail", "password": "Wachtwoord"}
+        "data": {
+          "username": "USPS-gebruikersnaam of e-mail",
+          "password": "Wachtwoord"
+        }
       },
       "informed_delivery_challenge": {
         "title": "Verifieer je USPS-aanmelding",
         "description": "USPS heeft nog een stap nodig om het aanmelden af te ronden. USPS zegt:\n\n{prompt}",
-        "data": {"answer": "Antwoord"}
+        "data": {
+          "answer": "Antwoord"
+        }
       },
       "user": {
         "title": "USPS instellen",
@@ -144,7 +152,8 @@
       "parcel_registered": "Een pakket is geregistreerd",
       "parcel_status_changed": "De status van een pakket is gewijzigd",
       "parcel_delivered": "Een pakket is bezorgd",
-      "parcel_delivery_time_changed": "De verwachte bezorgtijd van een pakket is gewijzigd"
+      "parcel_delivery_time_changed": "De verwachte bezorgtijd van een pakket is gewijzigd",
+      "letter_announced": "Er is gescande post aangekondigd"
     }
   },
   "entity": {
@@ -179,6 +188,15 @@
       },
       "parcel": {
         "name": "Pakket {barcode}"
+      },
+      "letters": {
+        "name": "Brieven",
+        "unit_of_measurement": "brieven"
+      }
+    },
+    "image": {
+      "letter_image": {
+        "name": "Brief {letter}"
       }
     }
   }

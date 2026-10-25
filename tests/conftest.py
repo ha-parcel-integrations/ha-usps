@@ -5,7 +5,10 @@ import sys
 import pytest
 from pytest_homeassistant_custom_component.plugins import hass  # noqa: F401
 
-from custom_components.usps.account import parcels as informed_delivery_parcels
+from custom_components.usps.account import (
+    letters as informed_delivery_letters,
+    parcels as informed_delivery_parcels,
+)
 from custom_components.usps.api import parcels as api_tracking_parcels
 
 
@@ -25,6 +28,7 @@ def reset_one_shot_warnings():
 
     api_tracking_parcels._unmapped_statuses_logged.clear()
     informed_delivery_parcels._unmapped_statuses_logged.clear()
+    informed_delivery_letters.reset_warning_state()
 
 
 if sys.platform == "win32":

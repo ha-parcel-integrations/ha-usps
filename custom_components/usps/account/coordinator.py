@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -20,9 +21,14 @@ from homeassistant.util import dt as dt_util
 from ..api.client import USPSApiError, USPSAuthError
 from ..const import CONF_REFRESH_TOKEN, DOMAIN, ParcelStatus
 from .client import InformedDeliveryClient, InformedDeliveryTokenExpired
+from .letters import extract_mail_pieces, merge_mail_pieces
 from .parcels import normalize_informed_delivery_parcel
 
 _LOGGER = logging.getLogger(__name__)
+
+# Only the mail/packages request date is US Eastern; everything in the payload
+# is local to the enrolled address.
+EASTERN = ZoneInfo("America/New_York")
 
 
 class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
@@ -58,6 +64,10 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         )
         self._cached_device_id: str | None = None
         self.last_success_time: datetime | None = None
+        self.letters: list[dict[str, Any]] = []
+        # ``None`` until the first successful mail fetch, so a restart does not
+        # announce every letter that was already in the dashboard.
+        self._known_letter_ids: set[str] | None = None
 
     @property
     def current_tier_minutes(self) -> int:
@@ -260,10 +270,78 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             for parcel in parcels
             if parcel.get("barcode")
         }
+        await self._async_update_letters(addresses)
         self.last_success_time = datetime.now(UTC)
         _LOGGER.debug(
-            "USPS Informed Delivery: poll returned %s active, %s delivered parcel(s)",
+            "USPS Informed Delivery: poll returned %s active, %s delivered "
+            "parcel(s), %s letter(s)",
             len(self._last_good),
             len(self.delivered),
+            len(self.letters),
         )
         return self._last_good
+
+    async def _async_update_letters(self, addresses: list[dict[str, Any]]) -> None:
+        """Refresh the scanned letter-mail list for every enrolled address.
+
+        Never fatal: the parcel inbox is this integration's job and mail rides
+        along with it, so a mail failure logs and leaves the previous list in
+        place rather than failing a poll that already has its parcels. Today
+        and yesterday are both fetched and unioned — before the morning batch
+        posts, "no mail yet today" and "no mail today" look identical.
+        """
+        today = datetime.now(EASTERN).date()
+        batches: list[list[dict[str, Any]]] = []
+        for address in addresses:
+            for offset in (0, 1):
+                date = (today - timedelta(days=offset)).isoformat()
+                try:
+                    payload = await self._client.async_get_mail_pieces(
+                        address["zip11"], date
+                    )
+                except (USPSApiError, aiohttp.ClientError, TimeoutError) as err:
+                    _LOGGER.warning(
+                        "USPS Informed Delivery: could not fetch scanned mail for "
+                        "%s — keeping the previous list (%s)",
+                        date,
+                        err,
+                    )
+                    return
+                batches.append(extract_mail_pieces(payload, requested_date=date))
+        self.letters = merge_mail_pieces(batches)
+        self._fire_letter_events(self.letters)
+        self._known_letter_ids = {letter["id"] for letter in self.letters}
+
+    async def async_get_letter_image(self, href: str) -> bytes | None:
+        """Fetch one scan, refreshing the access token once if it expired.
+
+        An image entity can be rendered at any point between polls, long after
+        the five-minute access token the last poll used has died, so the 401
+        retry lives here rather than being left to the next poll.
+        """
+        try:
+            return await self._client.async_get_image(href)
+        except InformedDeliveryTokenExpired:
+            generation = self._client.refresh_generation
+            async with self._refresh_lock:
+                if self._client.refresh_generation == generation:
+                    await self._client.async_refresh()
+                self._persist_tokens()
+            return await self._client.async_get_image(href)
+
+    def _fire_letter_events(self, letters: list[dict[str, Any]]) -> None:
+        """Fire ``usps_letter_announced`` for letter ids not seen before.
+
+        Silent on the first successful mail fetch: every letter is "new" then,
+        and announcing a dashboard's worth of post at startup is noise.
+        """
+        if self._known_letter_ids is None:
+            return
+        device_id = self._device_id()
+        for letter in letters:
+            if letter["id"] in self._known_letter_ids:
+                continue
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_letter_announced",
+                {**letter, "carrier": "USPS", "device_id": device_id},
+            )

@@ -27,6 +27,7 @@ Each config entry uses one source; you can add both.
 - [Options](#options)
 - [Removal](#removal)
 - [Sensors](#sensors)
+- [Letter mail](#letter-mail)
 - [Parcel status reference](#parcel-status-reference)
 - [Events](#events)
 - [Services](#services)
@@ -44,9 +45,10 @@ Each config entry uses one source; you can add both.
 - API Tracking follows the tracking codes you add, with optional event history
 - Per-parcel sensor with the canonical status (`registered` / `in_transit` / `out_for_delivery` / `delivered` / …), the carrier's own status text and a tracking deep-link
 - Summary sensors: incoming parcels, next delivery, recently delivered parcels
+- Informed Delivery also announces the **letter mail** on its way, with the scan of each envelope as an image entity
 - Read-only **Deliveries** calendar with the expected delivery days
 - `usps.track_parcel` / `usps.untrack_parcel` services (API Tracking), so a dashboard button can add a parcel
-- Events + device triggers for no-code automations (parcel registered, status changed, delivered, delivery time changed)
+- Events + device triggers for no-code automations (parcel registered, status changed, delivered, delivery time changed, mail announced)
 - Opt-in per-parcel status history
 - Manual refresh button and a diagnostic last-update sensor
 
@@ -152,6 +154,21 @@ Standard HA removal applies: **Settings → Devices & Services → USPS → ⋮ 
 
 A delivered parcel moves from its per-parcel sensor to the delivered sensor automatically.
 
+## Letter mail
+
+Informed Delivery scans the outside of the letter mail on its way to your address, and this integration shows what USPS announces. **API Tracking entries have none of this** — it is an Informed Delivery feature.
+
+| Entity | Description |
+|---|---|
+| `sensor.usps_letters` | How many pieces of mail USPS announced, full list under the `letters` attribute and the number that came with a scan under `with_scan` |
+| `image.usps_letter_<name>` | One per scanned piece, named after the sender when USPS gives one; the scan is fetched through Home Assistant, so it works on any dashboard |
+
+Today and yesterday are both checked, because USPS posts the day's mail in a morning batch — before it lands, "no mail yet" and "no mail today" look the same. Mail rides along with the parcel poll; there is no separate interval. A piece that drops out of the feed takes its image entity with it.
+
+Not every piece has a sender: USPS only names one for branded mail, so the rest are listed by their own identifier. A piece without a scan is still counted, it just gets no image.
+
+> **This feed has not been confirmed against a real account yet.** If your letters sensor stays at 0 while [informeddelivery.usps.com](https://informeddelivery.usps.com) shows mail, turn on [debug logging](#debugging) — the integration writes an explicit warning describing what it received, and that warning is exactly what we need in an issue.
+
 ## Parcel status reference
 
 The `status` field is the carrier-agnostic enum shared by the whole integration family. Informed Delivery only reaches `registered` / `in_transit` / `out_for_delivery` / `delivered` / `unknown`; API Tracking's broader vocabulary can plausibly reach every status below:
@@ -179,8 +196,9 @@ The integration fires these on the event bus (also available as device triggers 
 | `usps_parcel_status_changed` | A parcel's canonical status changes (`old_status` / `new_status` in the payload), except the final hop to delivered |
 | `usps_parcel_delivered` | A parcel is delivered |
 | `usps_parcel_delivery_time_changed` | The expected delivery window changes |
+| `usps_letter_announced` | Informed Delivery announces a piece of letter mail it has not shown before |
 
-Every payload is the full normalised parcel plus the hub's `device_id`. Events are suppressed on the first refresh after start-up.
+Every parcel payload is the full normalised parcel plus the hub's `device_id`; `usps_letter_announced` carries the letter's fields instead. Events are suppressed on the first refresh after start-up.
 
 ## Services
 

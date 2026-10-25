@@ -15,7 +15,11 @@ from zoneinfo import ZoneInfo
 import aiohttp
 
 from ..api.client import USPSApiError, USPSAuthError
-from ..const import INFORMED_DELIVERY_API_URL
+from ..const import (
+    INFORMED_DELIVERY_API_URL,
+    INFORMED_DELIVERY_IMAGE_BASE_URL,
+    INFORMED_DELIVERY_MAIL_URL,
+)
 from .auth import exchange_refresh_token
 
 EASTERN = ZoneInfo("America/New_York")
@@ -72,35 +76,37 @@ class InformedDeliveryClient:
             self._refresh_generation,
         )
 
-    async def async_get_packages(self, zip11: str) -> list[dict[str, Any]]:
-        """Return inbound and manually added packages for one address."""
-        # Never log the raw ZIP11 (it is a precise home address) — a stable
-        # hash is enough to tell "which address" apart in a multi-address log.
-        address_id = hashlib.sha256(zip11.encode()).hexdigest()[:8]
-        date = datetime.now(EASTERN).date().isoformat()
-        headers = {
+    def _headers(self) -> dict[str, str]:
+        return {
             "Authorization": f"Bearer {self._access_token}",
             "Origin": "https://informeddelivery.usps.com",
         }
-        body = {
-            "ZIP11": zip11,
-            "deliveryDate": date,
-            "source": "CP",
-            "electronicSignatureEligible": False,
-            "maxInboundPackages": 100,
-            "maxAddedPackages": 100,
-            "campaigns": True,
-        }
+
+    @staticmethod
+    def _address_id(zip11: str) -> str:
+        """Return a stable hash of the ZIP11 for logging.
+
+        Never log the raw value — it is a precise home address — but a stable
+        hash still tells two addresses apart in a multi-address log.
+        """
+        return hashlib.sha256(zip11.encode()).hexdigest()[:8]
+
+    async def _post_search(
+        self, url: str, body: dict[str, Any], *, address_id: str, label: str
+    ) -> Any:
+        """POST one dashboard search route and return its parsed body."""
         _LOGGER.debug(
-            "USPS Informed Delivery: POST packages/search address=%s date=%s",
+            "USPS Informed Delivery: POST %s address=%s date=%s",
+            label,
             address_id,
-            date,
+            body.get("deliveryDate"),
         )
         async with self._session.post(
-            INFORMED_DELIVERY_API_URL, json=body, headers=headers
+            url, json=body, headers=self._headers()
         ) as response:
             _LOGGER.debug(
-                "USPS Informed Delivery: packages/search address=%s -> HTTP %s",
+                "USPS Informed Delivery: %s address=%s -> HTTP %s",
+                label,
                 address_id,
                 response.status,
             )
@@ -127,10 +133,11 @@ class InformedDeliveryClient:
                 )
             if response.status == 204:
                 _LOGGER.debug(
-                    "USPS Informed Delivery: address=%s inbox is empty (204)",
+                    "USPS Informed Delivery: address=%s %s is empty (204)",
                     address_id,
+                    label,
                 )
-                return []
+                return {}
             if response.status == 429:
                 try:
                     retry_after = float(response.headers.get("Retry-After", ""))
@@ -146,9 +153,28 @@ class InformedDeliveryClient:
                     f"HTTP {response.status}", status_code=response.status
                 )
             try:
-                payload = await response.json(content_type=None)
+                return await response.json(content_type=None)
             except ValueError as err:
-                raise USPSApiError("unparseable package inbox") from err
+                raise USPSApiError(f"unparseable {label} body") from err
+
+    async def async_get_packages(self, zip11: str) -> list[dict[str, Any]]:
+        """Return inbound and manually added packages for one address."""
+        address_id = self._address_id(zip11)
+        date = datetime.now(EASTERN).date().isoformat()
+        payload = await self._post_search(
+            INFORMED_DELIVERY_API_URL,
+            {
+                "ZIP11": zip11,
+                "deliveryDate": date,
+                "source": "CP",
+                "electronicSignatureEligible": False,
+                "maxInboundPackages": 100,
+                "maxAddedPackages": 100,
+                "campaigns": True,
+            },
+            address_id=address_id,
+            label="packages/search",
+        )
         if not isinstance(payload, dict):
             raise USPSApiError("unexpected package inbox body")
         packages: list[dict[str, Any]] = []
@@ -170,3 +196,51 @@ class InformedDeliveryClient:
             len(packages),
         )
         return packages
+
+    async def async_get_mail_pieces(self, zip11: str, date: str) -> Any:
+        """Return the raw scanned letter-mail response for one address and day.
+
+        The body is handed back unparsed: ``letters.py`` owns reading it, and
+        owns reporting anything that does not look the way this integration
+        expects.
+        """
+        address_id = self._address_id(zip11)
+        payload = await self._post_search(
+            INFORMED_DELIVERY_MAIL_URL,
+            {
+                "ZIP11": zip11,
+                "deliveryDate": date,
+                "source": "CP",
+                "maxMailPieces": 100,
+                "campaigns": True,
+            },
+            address_id=address_id,
+            label="mail-pieces/search",
+        )
+        if isinstance(payload, dict) and len(payload.get("mailpieces") or []) == 100:
+            _LOGGER.warning(
+                "USPS Informed Delivery mail may be truncated at the 100-piece limit"
+            )
+        return payload
+
+    async def async_get_image(self, href: str) -> bytes | None:
+        """Fetch one scan's bytes, or ``None`` if it cannot be fetched.
+
+        A missing scan must never fail a poll or an entity: every failure
+        short-circuits to ``None``. A posted scan is immutable, so the caller
+        is free to cache whatever this returns.
+        """
+        url = (
+            href
+            if href.startswith("http")
+            else f"{INFORMED_DELIVERY_IMAGE_BASE_URL}/{href.lstrip('/')}"
+        )
+        async with self._session.get(url, headers=self._headers()) as response:
+            if response.status != 200:
+                _LOGGER.warning(
+                    "USPS Informed Delivery: scan image returned HTTP %s — the "
+                    "image entity stays empty",
+                    response.status,
+                )
+                return None
+            return await response.read()

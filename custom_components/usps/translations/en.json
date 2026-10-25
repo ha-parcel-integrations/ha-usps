@@ -5,17 +5,25 @@
       "api_tracking": {
         "title": "Set up USPS API Tracking",
         "description": "Enter the Consumer Key and Consumer Secret for your USPS app with Tracking enabled.",
-        "data": {"consumer_key": "Consumer Key", "consumer_secret": "Consumer Secret"}
+        "data": {
+          "consumer_key": "Consumer Key",
+          "consumer_secret": "Consumer Secret"
+        }
       },
       "informed_delivery": {
         "title": "Set up USPS Informed Delivery",
         "description": "Sign in with the USPS account enrolled in Informed Delivery. Reauthentication may require an MFA code.",
-        "data": {"username": "USPS username or email", "password": "Password"}
+        "data": {
+          "username": "USPS username or email",
+          "password": "Password"
+        }
       },
       "informed_delivery_challenge": {
         "title": "Verify your USPS sign-in",
         "description": "USPS needs one more step to finish signing in. USPS says:\n\n{prompt}",
-        "data": {"answer": "Answer"}
+        "data": {
+          "answer": "Answer"
+        }
       },
       "user": {
         "title": "Set up USPS",
@@ -144,7 +152,8 @@
       "parcel_registered": "A parcel was registered",
       "parcel_status_changed": "A parcel's status changed",
       "parcel_delivered": "A parcel was delivered",
-      "parcel_delivery_time_changed": "A parcel's expected delivery time changed"
+      "parcel_delivery_time_changed": "A parcel's expected delivery time changed",
+      "letter_announced": "Scanned mail was announced"
     }
   },
   "entity": {
@@ -179,6 +188,15 @@
       },
       "parcel": {
         "name": "Parcel {barcode}"
+      },
+      "letters": {
+        "name": "Letters",
+        "unit_of_measurement": "letters"
+      }
+    },
+    "image": {
+      "letter_image": {
+        "name": "Letter {letter}"
       }
     }
   }

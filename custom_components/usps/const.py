@@ -39,6 +39,9 @@ class ParcelStatus(StrEnum):
 
 
 PLATFORMS = [Platform.BUTTON, Platform.CALENDAR, Platform.SENSOR]
+# Letter scans exist only on the account source; forwarding IMAGE for an API
+# Tracking entry would set up a platform that can never hold an entity.
+INFORMED_DELIVERY_PLATFORMS = [*PLATFORMS, Platform.IMAGE]
 
 # Every optional key the parcel contract defines. CAPABILITIES below must be a
 # subset of this — it exists so a typo in CAPABILITIES fails a test instead of
@@ -100,6 +103,12 @@ TRACKING_URL = "https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking_c
 INFORMED_DELIVERY_API_URL = (
     "https://apis-id.usps.com/informed-delivery/v3/dashboard/packages/search"
 )
+INFORMED_DELIVERY_MAIL_URL = (
+    "https://apis-id.usps.com/informed-delivery/v3/dashboard/mail-pieces/search"
+)
+# Scan ``href``s come back relative; only this base is prepended, and only when
+# the href is not already absolute.
+INFORMED_DELIVERY_IMAGE_BASE_URL = "https://apis-id.usps.com/informed-delivery-images/v2"
 
 # Tracked parcels live in the config entry options as a list of
 # ``{tracking_code}`` dicts — this carrier has no account or parcel feed, so the

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -432,3 +433,73 @@ async def test_inbox_events_carry_the_device_id(hass):
     ):
         assert coordinator._device_id() == "device-1"
         assert coordinator._device_id() == "device-1"
+
+
+def _get_session(response):
+    session = MagicMock()
+    session.get.return_value = MagicMock(
+        __aenter__=AsyncMock(return_value=response),
+        __aexit__=AsyncMock(return_value=False),
+    )
+    return session
+
+
+async def test_mail_search_hands_back_the_raw_body_and_warns_at_the_cap(caplog):
+    response = AsyncMock(status=200)
+    response.json = AsyncMock(
+        return_value={"mailpieces": [{"mailpieceID": str(n)} for n in range(100)]}
+    )
+    session = MagicMock()
+    session.post.return_value = MagicMock(
+        __aenter__=AsyncMock(return_value=response),
+        __aexit__=AsyncMock(return_value=False),
+    )
+    payload = await InformedDeliveryClient(
+        "access", "refresh", session
+    ).async_get_mail_pieces("12345678901", "2026-10-25")
+    assert len(payload["mailpieces"]) == 100
+    assert "truncated at the 100-piece limit" in caplog.text
+    body = session.post.call_args.kwargs["json"]
+    assert body["deliveryDate"] == "2026-10-25"
+    assert body["maxMailPieces"] == 100
+
+
+async def test_a_relative_scan_href_is_resolved_against_the_image_host():
+    response = AsyncMock(status=200)
+    response.read = AsyncMock(return_value=b"jpeg")
+    session = _get_session(response)
+    client = InformedDeliveryClient("access", "refresh", session)
+
+    assert await client.async_get_image("/images/scan_1.jpg") == b"jpeg"
+    url = session.get.call_args.args[0]
+    assert url == (
+        "https://apis-id.usps.com/informed-delivery-images/v2/images/scan_1.jpg"
+    )
+
+    await client.async_get_image("https://example.invalid/scan.jpg")
+    assert session.get.call_args.args[0] == "https://example.invalid/scan.jpg"
+
+
+async def test_a_missing_scan_is_none_rather_than_an_error(caplog):
+    response = AsyncMock(status=404)
+    client = InformedDeliveryClient("access", "refresh", _get_session(response))
+    assert await client.async_get_image("/images/gone.jpg") is None
+    assert "scan image returned HTTP 404" in caplog.text
+
+
+async def test_an_expired_token_is_refreshed_once_before_refetching_a_scan(hass):
+    client = MagicMock(spec=InformedDeliveryClient)
+    client.access_token = "fresh"
+    client.refresh_token = "rotated"
+    client.refresh_generation = 0
+    client.async_refresh = AsyncMock()
+    client.async_get_image = AsyncMock(
+        side_effect=[InformedDeliveryTokenExpired("expired"), b"jpeg"]
+    )
+    entry = MagicMock(spec=ConfigEntry, data={}, options={}, entry_id="e")
+    coordinator = InformedDeliveryCoordinator(hass, client, entry)
+
+    with patch.object(coordinator, "_persist_tokens") as persist:
+        assert await coordinator.async_get_letter_image("/images/scan.jpg") == b"jpeg"
+    client.async_refresh.assert_awaited_once()
+    persist.assert_called_once()
