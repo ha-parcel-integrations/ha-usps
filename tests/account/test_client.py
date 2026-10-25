@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -337,8 +338,11 @@ async def _inbox_coordinator(hass, *polls):
         "delivered",
         "delivery_time_changed",
     ):
+        # ``@callback`` matters: an undecorated listener runs in the executor,
+        # and these assertions are about the order the events were fired in.
         hass.bus.async_listen(
-            f"usps_parcel_{name}", lambda event, name=name: events.append(name)
+            f"usps_parcel_{name}",
+            callback(lambda event, name=name: events.append(name)),
         )
     return InformedDeliveryCoordinator(hass, client, entry), events
 
