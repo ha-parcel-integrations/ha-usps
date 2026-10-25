@@ -108,7 +108,9 @@ INFORMED_DELIVERY_MAIL_URL = (
 )
 # Scan ``href``s come back relative; only this base is prepended, and only when
 # the href is not already absolute.
-INFORMED_DELIVERY_IMAGE_BASE_URL = "https://apis-id.usps.com/informed-delivery-images/v2"
+INFORMED_DELIVERY_IMAGE_BASE_URL = (
+    "https://apis-id.usps.com/informed-delivery-images/v2"
+)
 
 # Tracked parcels live in the config entry options as a list of
 # ``{tracking_code}`` dicts — this carrier has no account or parcel feed, so the

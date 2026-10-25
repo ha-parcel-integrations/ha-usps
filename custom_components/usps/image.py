@@ -188,8 +188,7 @@ class USPSLetterImage(CoordinatorEntity[InformedDeliveryCoordinator], ImageEntit
             # so even an auth failure is deferred to the next poll, which is
             # the one place still allowed to escalate it into reauth.
             _LOGGER.warning(
-                "USPS Informed Delivery: could not fetch the scan for mailpiece "
-                "%s: %s",
+                "USPS Informed Delivery: could not fetch the scan for mailpiece %s: %s",
                 self._letter_id,
                 err,
             )
