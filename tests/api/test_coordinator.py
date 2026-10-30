@@ -10,6 +10,8 @@ from custom_components.usps.api.client import USPSApiError
 from custom_components.usps.api.coordinator import BACKOFF_BASE_SECONDS, USPSCoordinator
 from custom_components.usps.api.parcels import normalize_api_tracking_parcel
 from custom_components.usps.const import (
+    CONF_DELIVERED_FILTER_AMOUNT,
+    CONF_DELIVERED_FILTER_TYPE,
     CONF_PARCELS,
     CONF_TRACKING_CODE,
     DOMAIN,
@@ -99,3 +101,42 @@ async def test_delivery_transition_fires_only_delivered_event(hass):
     )
     await hass.async_block_till_done()
     assert len(events) == 1
+
+
+async def test_a_parcel_the_delivered_list_leaves_out_still_fires_delivered(hass):
+    """The retention option limits the delivered sensor, never the events."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        options={
+            CONF_PARCELS: [
+                {CONF_TRACKING_CODE: "9400"},
+                {CONF_TRACKING_CODE: "9401"},
+            ],
+            CONF_DELIVERED_FILTER_TYPE: "parcels",
+            CONF_DELIVERED_FILTER_AMOUNT: 1,
+        },
+    )
+    client = MagicMock()
+    coordinator = USPSCoordinator(hass, client, entry)
+    events = []
+    hass.bus.async_listen("usps_parcel_delivered", lambda event: events.append(event))
+
+    def sample(code, category):
+        return {
+            "trackingNumber": code,
+            "statusCategory": category,
+            "trackingEvents": [],
+        }
+
+    client.async_get_parcel = AsyncMock(
+        side_effect=lambda code: sample(code, "In Transit")
+    )
+    await coordinator._async_update_data()
+    client.async_get_parcel = AsyncMock(
+        side_effect=lambda code: sample(code, "Delivered")
+    )
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+
+    assert sorted(event.data["barcode"] for event in events) == ["9400", "9401"]
+    assert len(coordinator.delivered) == 1
