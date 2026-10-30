@@ -152,6 +152,7 @@ Standard HA removal applies: **Settings → Devices & Services → USPS → ⋮ 
 | `sensor.usps_awaiting_pickup` | Parcels held at a post office or ready for pickup; list under the `parcels` attribute |
 | `sensor.usps_delivered_parcels` | Recently delivered parcels (see the retention option) |
 | `sensor.usps_letters` | Informed Delivery only: announced letter mail — see [Letter mail](#letter-mail) |
+| `calendar.usps_deliveries` | Read-only calendar of expected deliveries, no extra API calls |
 | `sensor.usps_last_successful_update` | Diagnostic: when USPS was last polled successfully |
 
 A delivered parcel moves from its per-parcel sensor to the delivered sensor automatically.
