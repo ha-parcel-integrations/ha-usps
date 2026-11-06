@@ -25,6 +25,18 @@ body:
       render: text
     validations:
       required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which USPS setup logged it?
+      description: The source you picked during setup, shown on the integration's entry under Settings → Devices & services → USPS.
+      options:
+        - API Tracking
+        - Informed Delivery
+        - Not sure
+    validations:
+      required: true
+
   - type: input
     id: version
     attributes:
