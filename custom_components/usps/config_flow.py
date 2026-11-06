@@ -63,6 +63,14 @@ _INFORMED_SCHEMA = vol.Schema(
         ),
     }
 )
+# Filled into the Informed Delivery form's text at runtime: hassfest forbids
+# literal URLs/domains in strings.json, so the sign-in host, cookie host and
+# cookie name live here and the translations only carry the placeholders.
+_INFORMED_PLACEHOLDERS = {
+    "login_site": "informeddelivery.usps.com",
+    "cookie_site": "verified.usps.com",
+    "cookie_name": "dfdc00f11bc995e",
+}
 
 
 def normalize_tracking_code(value: str) -> str:
@@ -229,6 +237,7 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
                 step_id=SOURCE_INFORMED_DELIVERY,
                 data_schema=_INFORMED_SCHEMA,
                 errors={"base": "not_enrolled"},
+                description_placeholders=_INFORMED_PLACEHOLDERS,
             )
         account = hashlib.sha256(self._id_username.lower().encode()).hexdigest()[:12]
         await self.async_set_unique_id(f"{SOURCE_INFORMED_DELIVERY}:{account}")
@@ -321,6 +330,7 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
                 _INFORMED_SCHEMA, suggested
             ),
             errors=errors,
+            description_placeholders=_INFORMED_PLACEHOLDERS,
         )
 
     async def async_step_reauth(

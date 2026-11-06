@@ -19,14 +19,14 @@
       },
       "informed_delivery": {
         "title": "Set up USPS Informed Delivery",
-        "description": "USPS now blocks Home Assistant from signing in directly, so Informed Delivery is set up from a browser you have already signed in with.",
+        "description": "USPS now blocks Home Assistant from signing in directly, so Informed Delivery is set up from a browser you have already signed in with. Sign in at {login_site}, then open your browser's developer tools, find the cookies stored for {cookie_site}, and copy the value of the cookie named {cookie_name}.",
         "data": {
           "username": "USPS username or email",
           "session_token": "Browser session cookie"
         },
         "data_description": {
           "username": "The account you signed in with; it labels this entry. On reauthentication, leave it as it is.",
-          "session_token": "Sign in at https://informeddelivery.usps.com, then in your browser's developer tools copy the value of the cookie named dfdc00f11bc995e stored for verified.usps.com and paste it here. It is exchanged once for a renewable token and is never stored."
+          "session_token": "Paste the {cookie_name} cookie value here. It is exchanged once for a renewable token and is never stored."
         }
       },
       "reauth_confirm": {
@@ -43,7 +43,7 @@
       "tracking_not_enabled": "These credentials do not have the USPS Tracking product enabled.",
       "not_enrolled": "No address on this USPS account is enrolled in Informed Delivery.",
       "cannot_connect": "Could not reach USPS. Please try again.",
-      "invalid_session": "That browser session could not be used to sign in. Make sure you are still signed in at informeddelivery.usps.com, then copy a fresh cookie value and try again."
+      "invalid_session": "That browser session could not be used to sign in. Make sure you are still signed in to USPS Informed Delivery, then copy a fresh cookie value and try again."
     },
     "abort": {
       "already_configured": "USPS is already set up.",

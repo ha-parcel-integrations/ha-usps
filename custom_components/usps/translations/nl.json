@@ -12,14 +12,14 @@
       },
       "informed_delivery": {
         "title": "USPS Informed Delivery instellen",
-        "description": "USPS blokkeert nu dat Home Assistant rechtstreeks inlogt, dus Informed Delivery wordt ingesteld vanuit een browser waarin je al bent ingelogd.",
+        "description": "USPS blokkeert nu dat Home Assistant rechtstreeks inlogt, dus Informed Delivery wordt ingesteld vanuit een browser waarin je al bent ingelogd. Log in op {login_site}, open daarna de ontwikkelaarstools van je browser, zoek de cookies die zijn opgeslagen voor {cookie_site} en kopieer de waarde van de cookie met de naam {cookie_name}.",
         "data": {
           "username": "USPS-gebruikersnaam of e-mail",
           "session_token": "Browser-sessiecookie"
         },
         "data_description": {
           "username": "Het account waarmee je bent ingelogd; het is het label van deze invoer. Laat dit bij herverificatie ongewijzigd.",
-          "session_token": "Log in op https://informeddelivery.usps.com en kopieer in de ontwikkelaarstools van je browser de waarde van de cookie met de naam dfdc00f11bc995e die is opgeslagen voor verified.usps.com, en plak die hier. Deze wordt eenmalig ingewisseld voor een vernieuwbaar token en wordt niet opgeslagen."
+          "session_token": "Plak hier de waarde van de cookie {cookie_name}. Deze wordt eenmalig ingewisseld voor een vernieuwbaar token en wordt niet opgeslagen."
         }
       },
       "user": {
@@ -43,7 +43,7 @@
       "not_enrolled": "Geen adres op dit USPS-account is ingeschreven voor Informed Delivery.",
       "tracking_not_enabled": "Deze gegevens hebben USPS Tracking niet ingeschakeld.",
       "cannot_connect": "Kon USPS niet bereiken. Probeer het opnieuw.",
-      "invalid_session": "Die browsersessie kon niet worden gebruikt om in te loggen. Zorg dat je nog bent ingelogd op informeddelivery.usps.com, kopieer dan een verse cookiewaarde en probeer opnieuw."
+      "invalid_session": "Die browsersessie kon niet worden gebruikt om in te loggen. Zorg dat je nog bent ingelogd bij USPS Informed Delivery, kopieer dan een verse cookiewaarde en probeer opnieuw."
     },
     "abort": {
       "already_configured": "USPS is al ingesteld.",
