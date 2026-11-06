@@ -60,7 +60,35 @@ five minutes old at best, so a restart that polls on it leaves "expired or
 revoked?" to USPS's 401 body, and a normal restart then reads as a dead
 session.
 
-Informed Delivery sign-in tripwires, each found against a real account:
+**Sign-in is a browser-session handoff, not an in-HA login.** USPS put Akamai
+Bot Manager in front of the interactive sign-in's credential round: a native
+POST to `/authenticate` is answered with an HTML `403` (confirmed on three
+installations, two countries, #12), and rounds 0/1 plus the whole OAuth leg
+stay open. The gate wants a browser that runs Akamai's JS sensor; a
+server-side client cannot clear it, and faking the sensor is out of scope. So
+setup and reauth take the ForgeRock SSO **session cookie** the user copies
+from their own signed-in browser (`config_flow._INFORMED_SCHEMA`:
+`CONF_SESSION_TOKEN`). `LoginJourney.finish()` trades it — via
+`/oauth2/authorize` + the code exchange, a leg that is **not** behind the gate
+— for the OAuth tokens (proven end to end against a real session). The cookie
+is used once and never stored; only the rotating refresh token persists, so
+steady-state and reauth frequency are unchanged — reauth is just possible
+again. Reauth prefills the entry's username because the entry's `unique_id` is
+derived from it, so a retype would trip `unique_id_mismatch`.
+
+The interactive `LoginJourney` engine (`account/auth.py`:
+`start`/`_advance`/`answer` and all the callback handling) is **retained but
+detached** — the config-flow challenge steps were removed, so it is no longer
+reachable from the UI. If USPS lifts the gate, restore those steps from git.
+**We may delete the dormant engine later** (noted here so a future reader
+knows it is deliberately unreferenced, not dead-by-accident). Its 403 still
+raises `USPSBlockedError` if the engine is ever driven, logging the response
+content type (JSON = USPS's login service refusing the journey, HTML = the
+edge refusing the request) but never the body, which echoes the payload.
+
+Tripwires from reverse-engineering that live login, each found against a real
+account — kept because they are what the detached engine (and any revival of
+it) depends on:
 - **Own connector.** `account/session.py` builds its own IPv4
   `TCPConnector`. Any HA session helper (also `async_create_clientsession`)
   shares HA's pooled connector, and USPS's edge then answers the credentials

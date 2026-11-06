@@ -38,6 +38,16 @@ class TrackingNotEnabledError(USPSAuthError):
     """The credentials work but were not issued the Tracking scope."""
 
 
+class USPSBlockedError(USPSApiError):
+    """USPS refused the request itself rather than rejecting a credential.
+
+    Separate from :class:`USPSAuthError` because nothing the user can change
+    in Home Assistant fixes it: the sign-in never reached the credential
+    check. Separate from a plain :class:`USPSApiError` because "could not
+    reach USPS" is wrong — USPS answered, and answered with a refusal.
+    """
+
+
 class ApiTrackingClient:
     """OAuth client-credentials client with an in-memory access-token cache."""
 

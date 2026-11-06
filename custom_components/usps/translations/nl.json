@@ -12,17 +12,14 @@
       },
       "informed_delivery": {
         "title": "USPS Informed Delivery instellen",
-        "description": "Meld je aan met het USPS-account dat is ingeschreven voor Informed Delivery. Opnieuw verifiëren kan MFA vereisen.",
+        "description": "USPS blokkeert nu dat Home Assistant rechtstreeks inlogt, dus Informed Delivery wordt ingesteld vanuit een browser waarin je al bent ingelogd.",
         "data": {
           "username": "USPS-gebruikersnaam of e-mail",
-          "password": "Wachtwoord"
-        }
-      },
-      "informed_delivery_challenge": {
-        "title": "Verifieer je USPS-aanmelding",
-        "description": "USPS heeft nog een stap nodig om het aanmelden af te ronden. USPS zegt:\n\n{prompt}",
-        "data": {
-          "answer": "Antwoord"
+          "session_token": "Browser-sessiecookie"
+        },
+        "data_description": {
+          "username": "Het account waarmee je bent ingelogd; het is het label van deze invoer. Laat dit bij herverificatie ongewijzigd.",
+          "session_token": "Log in op https://informeddelivery.usps.com en kopieer in de ontwikkelaarstools van je browser de waarde van de cookie met de naam dfdc00f11bc995e die is opgeslagen voor verified.usps.com, en plak die hier. Deze wordt eenmalig ingewisseld voor een vernieuwbaar token en wordt niet opgeslagen."
         }
       },
       "user": {
@@ -46,9 +43,7 @@
       "not_enrolled": "Geen adres op dit USPS-account is ingeschreven voor Informed Delivery.",
       "tracking_not_enabled": "Deze gegevens hebben USPS Tracking niet ingeschakeld.",
       "cannot_connect": "Kon USPS niet bereiken. Probeer het opnieuw.",
-      "too_many_challenges": "USPS heeft te veel verificatiestappen achter elkaar gevraagd. Probeer opnieuw aan te melden.",
-      "invalid_code": "USPS heeft die verificatiecode niet geaccepteerd. Meld je opnieuw aan om een nieuwe te ontvangen.",
-      "push_approval_timeout": "USPS wacht tot je deze aanmelding op je telefoon goedkeurt, maar dat duurde te lang. Probeer het opnieuw en keur de melding snel goed."
+      "invalid_session": "Die browsersessie kon niet worden gebruikt om in te loggen. Zorg dat je nog bent ingelogd op informeddelivery.usps.com, kopieer dan een verse cookiewaarde en probeer opnieuw."
     },
     "abort": {
       "already_configured": "USPS is al ingesteld.",

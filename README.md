@@ -85,11 +85,14 @@ Or set it up by hand: add the integration via **Settings → Devices & Services 
 
 ### Informed Delivery
 
-1. Enter your USPS username (or email) and password.
-2. USPS usually asks for a verification step: choose how to receive a passcode (for example by email), then enter the passcode. The form shows USPS's own text for each step.
-3. The entry is created once USPS confirms at least one address enrolled in Informed Delivery.
+USPS currently blocks apps from signing in directly, so Home Assistant uses a session from a browser you have already signed in with:
 
-Your password is not stored; only the session USPS hands back is kept, and it is renewed automatically while Home Assistant runs. After Home Assistant has been offline for a while that session expires, and Home Assistant asks you to sign in again (including the passcode).
+1. Sign in at [informeddelivery.usps.com](https://informeddelivery.usps.com) in your browser.
+2. Open your browser's developer tools, find the stored cookies for `verified.usps.com`, and copy the value of the cookie named `dfdc00f11bc995e`.
+3. In Home Assistant, enter your USPS username (or email) and paste that cookie value.
+4. The entry is created once USPS confirms at least one address enrolled in Informed Delivery.
+
+Neither your password nor the cookie is stored; the cookie is exchanged once for a renewable token, which is kept and refreshed automatically while Home Assistant runs. After Home Assistant has been offline for a while that token expires, and Home Assistant asks you to paste a fresh cookie — sign in again in your browser and repeat the steps above.
 
 Packages appear by themselves; there is nothing to add.
 
@@ -242,11 +245,11 @@ The log never contains passwords, keys or tokens, and addresses are only logged 
 - **A parcel shows `unknown`** — USPS has not scanned it yet (their API answers `not_found` until the first scan), or the code is wrong. It will pick up automatically once scanned.
 - **A status logs "Unrecognised USPS status"** — please [open an issue](https://github.com/ha-parcel-integrations/ha-usps/issues/new?template=unrecognised_status.yml) with the logged line so the mapping can be extended.
 - **"No address on this USPS account is enrolled in Informed Delivery"** — sign-in worked, but the account has no enrolled address. Enroll one at [informeddelivery.usps.com](https://informeddelivery.usps.com) first.
-- **"USPS did not accept that verification code"** — the passcode was wrong or expired. Sign in again to receive a new one.
-- **Informed Delivery asks to sign in again** — the session expired, usually after Home Assistant was offline for a while. This cannot be renewed without you, because USPS asks for a passcode. A normal restart should not ask: the session is renewed as Home Assistant starts.
+- **Informed Delivery asks to sign in again** — the saved token expired, usually after Home Assistant was offline for a while. It cannot be renewed without you, because USPS now requires a browser to sign in; paste a fresh cookie as in [setup](#informed-delivery). A normal restart should not ask: the token is renewed as Home Assistant starts.
 - **The letters sensor stays at 0** — if [informeddelivery.usps.com](https://informeddelivery.usps.com) shows mail for today and this does not, enable debug logging: the integration logs a warning naming exactly what USPS sent back. That line is what an issue needs. A day genuinely without mail is `0` with no warning at all.
 - **"These credentials do not have the USPS Tracking product enabled"** — add the Tracking API to your app on the USPS developer portal.
 - **"Could not reach USPS"** — a network problem or a temporary USPS outage. Try again later; if it keeps happening, attach a debug log to an issue.
+- **"That browser session could not be used to sign in"** — the pasted cookie was not a live session: it was copied while signed out, from the wrong cookie, or it has since expired. Sign in again at informeddelivery.usps.com, copy a fresh `dfdc00f11bc995e` value, and paste it straight away.
 
 ## Related integrations
 

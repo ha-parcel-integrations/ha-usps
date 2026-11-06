@@ -20,14 +20,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .account.auth import (
-    JourneyChallenge,
-    JourneyRejected,
-    LoginJourney,
-    callback_choices,
-    enrolled_addresses,
-    granted_services,
-)
+from .account.auth import LoginJourney, enrolled_addresses, granted_services
 from .account.session import async_new_informed_delivery_session
 from .api.client import (
     ApiTrackingClient,
@@ -43,6 +36,7 @@ from .const import (
     CONF_INCLUDE_HISTORY,
     CONF_PARCELS,
     CONF_REFRESH_TOKEN,
+    CONF_SESSION_TOKEN,
     CONF_SOURCE,
     CONF_TRACKING_CODE,
     CONF_USERNAME,
@@ -62,28 +56,13 @@ _API_SCHEMA = vol.Schema(
     {vol.Required(CONF_CONSUMER_KEY): str, vol.Required(CONF_CONSUMER_SECRET): str}
 )
 _INFORMED_SCHEMA = vol.Schema(
-    {vol.Required(CONF_USERNAME): str, vol.Required("password"): str}
+    {
+        vol.Required(CONF_USERNAME): str,
+        vol.Required(CONF_SESSION_TOKEN): selector.TextSelector(
+            selector.TextSelectorConfig(multiline=True)
+        ),
+    }
 )
-
-# ForgeRock callback classes this flow knows how to render as a challenge
-# form, and how.
-_CHOICE_CALLBACKS = {"ChoiceCallback", "ConfirmationCallback"}
-_TEXT_CALLBACKS = {"TextInputCallback", "OneTimePasswordCallback"}
-_BOOLEAN_CALLBACKS = {"BooleanAttributeInputCallback"}
-
-
-def _informed_delivery_auth_error(
-    err: USPSAuthError, after_challenge: bool = False
-) -> str:
-    """Classify a login-journey ``USPSAuthError`` into a translated error key."""
-    if isinstance(err, JourneyRejected) and after_challenge:
-        return "invalid_code"
-    message = str(err)
-    if "Too many" in message:
-        return "too_many_challenges"
-    if "push-approval" in message:
-        return "push_approval_timeout"
-    return "invalid_auth"
 
 
 def normalize_tracking_code(value: str) -> str:
@@ -279,157 +258,68 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_informed_delivery(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Authenticate a household login without persisting its password."""
+        """Set up (or reauthenticate) Informed Delivery from a browser session.
+
+        USPS placed a bot gate on the interactive sign-in's credential round
+        (see ``account/auth.py``), so the automatic ``LoginJourney`` can no
+        longer be driven from Home Assistant — it is reached only by a real
+        browser. The user signs in with their own browser, which clears that
+        gate, and pastes the resulting ForgeRock session cookie here. It is
+        traded once, via :meth:`_async_finish_informed_delivery`, for the
+        OAuth refresh token and is never stored. The same step backs reauth,
+        which is why a signed-out user whose refresh chain expired can
+        recover at all.
+
+        The interactive ``LoginJourney`` engine in ``account/auth.py`` is
+        retained (it still mints the token in :meth:`LoginJourney.finish`),
+        but the config-flow steps that drove its MFA challenges are gone from
+        the UI. Restoring the automatic sign-in, if USPS lifts the gate, means
+        bringing those steps back from git. See this repo's ``CLAUDE.md``.
+        """
         errors: dict[str, str] = {}
+        reauth = getattr(self, "_reauth_source", None) == SOURCE_INFORMED_DELIVERY
         if user_input is not None:
-            self._id_username = user_input[CONF_USERNAME]
-            _LOGGER.debug("USPS Informed Delivery setup: starting login journey")
+            self._id_username = user_input[CONF_USERNAME].strip()
             if self._id_session is None:
                 # A genuinely private connector, not merely a private
                 # session sharing HA's pooled one — see session.py for why
                 # that distinction is the whole fix. Ours to close; done in
                 # async_remove() below on every terminal outcome.
                 self._id_session = async_new_informed_delivery_session(self.hass)
-            journey = LoginJourney(self._id_session)
-            self._id_journey = journey
+            self._id_journey = LoginJourney(self._id_session)
             try:
-                token_id = await journey.start(
-                    user_input[CONF_USERNAME], user_input["password"]
+                return await self._async_finish_informed_delivery(
+                    user_input[CONF_SESSION_TOKEN].strip()
                 )
-            except JourneyChallenge:
-                return self._async_show_challenge_form(journey)
             except USPSAuthError as err:
-                _LOGGER.debug("USPS Informed Delivery setup: login rejected (%s)", err)
-                errors["base"] = _informed_delivery_auth_error(err)
-            except (USPSApiError, aiohttp.ClientError) as err:
-                _LOGGER.warning(
-                    "USPS Informed Delivery setup: could not reach the login endpoint (%s)",
-                    err,
-                )
-                errors["base"] = "cannot_connect"
-            else:
-                try:
-                    return await self._async_finish_informed_delivery(token_id)
-                except USPSAuthError as err:
-                    _LOGGER.debug(
-                        "USPS Informed Delivery setup: token exchange rejected (%s)",
-                        err,
-                    )
-                    errors["base"] = "invalid_auth"
-                except (USPSApiError, aiohttp.ClientError) as err:
-                    _LOGGER.warning(
-                        "USPS Informed Delivery setup: could not complete token exchange (%s)",
-                        err,
-                    )
-                    errors["base"] = "cannot_connect"
-        return self.async_show_form(
-            step_id=SOURCE_INFORMED_DELIVERY,
-            data_schema=_INFORMED_SCHEMA,
-            errors=errors,
-        )
-
-    def _async_show_challenge_form(
-        self, journey: LoginJourney, errors: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
-        """Render the one pending ForgeRock callback as an HA selector/field.
-
-        Never renders anything outside the allowlist ``fill_automatic_callbacks``
-        already enforces — this only chooses *how* to draw the one callback it
-        already decided is safe to ask about.
-        """
-        callback = journey.pending_callback or {}
-        kind = callback.get("type", "")
-        _LOGGER.debug(
-            "USPS Informed Delivery setup: rendering challenge %s — prompt=%r choices=%s",
-            kind,
-            journey.pending_prompt,
-            callback_choices(callback),
-        )
-        if kind in _CHOICE_CALLBACKS:
-            choices = callback_choices(callback)
-            if not choices:
-                # Defensive fallback: an unexpected output shape must not
-                # produce an empty, apparently-blank SelectSelector — a plain
-                # text field at least lets the user answer something.
-                _LOGGER.warning(
-                    "USPS Informed Delivery setup: %s had no recognisable choices "
-                    "list — falling back to a text field",
-                    kind,
-                )
-                schema = vol.Schema({vol.Required("answer"): str})
-            else:
-                schema = vol.Schema(
-                    {
-                        vol.Required("answer"): selector.SelectSelector(
-                            selector.SelectSelectorConfig(
-                                options=[
-                                    selector.SelectOptionDict(
-                                        value=str(index), label=str(choice)
-                                    )
-                                    for index, choice in enumerate(choices)
-                                ],
-                                mode=selector.SelectSelectorMode.LIST,
-                            )
-                        )
-                    }
-                )
-        elif kind in _BOOLEAN_CALLBACKS:
-            schema = vol.Schema({vol.Required("answer"): selector.BooleanSelector()})
-        else:
-            schema = vol.Schema({vol.Required("answer"): str})
-        return self.async_show_form(
-            step_id="informed_delivery_challenge",
-            data_schema=schema,
-            errors=errors or {},
-            description_placeholders={"prompt": journey.pending_prompt},
-        )
-
-    async def async_step_informed_delivery_challenge(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Answer the one pending ForgeRock callback and resume the journey."""
-        journey = self._id_journey
-        if journey is None:
-            return await self.async_step_informed_delivery()
-        if user_input is None:
-            return self._async_show_challenge_form(journey)
-        errors: dict[str, str] = {}
-        try:
-            token_id = await journey.answer(str(user_input["answer"]))
-        except JourneyChallenge:
-            return self._async_show_challenge_form(journey)
-        except USPSAuthError as err:
-            _LOGGER.debug(
-                "USPS Informed Delivery setup: challenge answer rejected (%s)", err
-            )
-            errors["base"] = _informed_delivery_auth_error(err, after_challenge=True)
-        except (USPSApiError, aiohttp.ClientError) as err:
-            _LOGGER.warning(
-                "USPS Informed Delivery setup: could not reach the login endpoint (%s)",
-                err,
-            )
-            errors["base"] = "cannot_connect"
-        else:
-            try:
-                return await self._async_finish_informed_delivery(token_id)
-            except USPSAuthError as err:
+                # A missing/expired/wrong session cookie never reaches the
+                # authorization code, so finish() raises here — the actionable
+                # message is "that cookie is not a live session", not "wrong
+                # credentials".
                 _LOGGER.debug(
-                    "USPS Informed Delivery setup: token exchange rejected (%s)", err
+                    "USPS Informed Delivery setup: session token rejected (%s)", err
                 )
-                errors["base"] = "invalid_auth"
+                errors["base"] = "invalid_session"
             except (USPSApiError, aiohttp.ClientError) as err:
                 _LOGGER.warning(
-                    "USPS Informed Delivery setup: could not complete token exchange (%s)",
+                    "USPS Informed Delivery setup: could not complete the token "
+                    "exchange (%s)",
                     err,
                 )
                 errors["base"] = "cannot_connect"
-        # A ForgeRock journey cannot be resumed after a failed round; only a
-        # fresh sign-in gets a new one, so never re-show a challenge with
-        # nothing pending behind it.
-        self._id_journey = None
+        suggested: dict[str, Any] = {}
+        if reauth:
+            # Prefill the username from the entry being reauthenticated: the
+            # entry's unique_id is derived from it, so a user who retyped it
+            # differently would trip unique_id_mismatch and never recover.
+            suggested[CONF_USERNAME] = self._get_reauth_entry().data.get(
+                CONF_USERNAME, ""
+            )
         return self.async_show_form(
             step_id=SOURCE_INFORMED_DELIVERY,
-            data_schema=_INFORMED_SCHEMA,
+            data_schema=self.add_suggested_values_to_schema(
+                _INFORMED_SCHEMA, suggested
+            ),
             errors=errors,
         )
 

@@ -17,7 +17,7 @@ import uuid
 
 import aiohttp
 
-from ..api.client import USPSApiError, USPSAuthError
+from ..api.client import USPSApiError, USPSAuthError, USPSBlockedError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -158,6 +158,30 @@ def _polling_wait_ms(callbacks: list[dict[str, Any]]) -> int | None:
         if wait_ms > 0:
             return wait_ms
     return None
+
+
+async def _refusal_summary(response: aiohttp.ClientResponse) -> tuple[str, Any, Any]:
+    """Return a loggable summary of a refused response.
+
+    Only the content type and ForgeRock's own ``code``/``reason`` are read: a
+    4xx body on ``/authenticate`` echoes back the request it refused, so no
+    other field — and never the body itself — is logged or carried into the
+    error. The content type is the part that separates the two causes a 403
+    can have: JSON is ForgeRock refusing the journey, HTML is the edge
+    refusing the request before ForgeRock ever saw it.
+    """
+    content_type = str(response.content_type or "unknown")
+    code: Any = None
+    reason: Any = None
+    if content_type.endswith("json"):
+        try:
+            body = await response.json(content_type=None)
+        except (ValueError, aiohttp.ClientError):
+            body = None
+        if isinstance(body, dict):
+            code = body.get("code")
+            reason = body.get("reason")
+    return content_type, code, reason
 
 
 def fill_automatic_callbacks(
@@ -466,6 +490,7 @@ class LoginJourney:
         self._session = session
         self._endpoint = ""
         self._headers: dict[str, str] = {}
+        self._server: dict[str, Any] = {}
         self._payload: dict[str, Any] = {}
         # Stable per installation: a device profile that changes on every
         # login looks like a new device to USPS and invites extra verification.
@@ -480,8 +505,15 @@ class LoginJourney:
         # value-presence check.
         self._answered_ids: set[int] = set()
 
-    async def start(self, username: str, password: str) -> str:
-        """Begin the journey and return a ``tokenId`` once it completes."""
+    async def _ensure_server(self) -> dict[str, Any]:
+        """Fetch ``/serverinfo`` once and cache the realm and session-cookie name.
+
+        Shared by :meth:`start` (the interactive journey) and :meth:`finish`
+        (the browser-session handoff, which skips the journey entirely but
+        still needs the session cookie's name for ``/oauth2/authorize``).
+        """
+        if self._server:
+            return self._server
         async with self._session.get(f"{AM}/json/serverinfo/*") as response:
             _LOGGER.debug(
                 "USPS Informed Delivery: GET /serverinfo -> HTTP %s", response.status
@@ -491,15 +523,20 @@ class LoginJourney:
                     f"HTTP {response.status}", status_code=response.status
                 )
             server = await _read_json(response, "/serverinfo")
-        self._server = server
-        realm = str(server.get("realm", "/alpha")).strip("/")
+        self._server = server if isinstance(server, dict) else {}
+        realm = str(self._server.get("realm", "/alpha")).strip("/")
         self._endpoint = f"{AM}/json/realms/root/realms/{realm}/authenticate"
         self._headers = {"Accept-API-Version": "resource=2.0, protocol=1.0"}
         _LOGGER.debug(
             "USPS Informed Delivery: resolved realm=%s cookieName=%s",
             realm,
-            server.get("cookieName"),
+            self._server.get("cookieName"),
         )
+        return self._server
+
+    async def start(self, username: str, password: str) -> str:
+        """Begin the journey and return a ``tokenId`` once it completes."""
+        await self._ensure_server()
         return await self._advance(username, password)
 
     async def answer(self, answer: str) -> str:
@@ -551,14 +588,35 @@ class LoginJourney:
                     )
                     raise USPSAuthError("Login failure", status_code=401)
                 if response.status != 200:
-                    # A transient Akamai/edge 5xx (often an HTML block page,
-                    # not JSON) — surface it as an ordinary API error rather
-                    # than attempt to parse a body that was never JSON.
+                    # Two different failures used to share this branch and
+                    # the "could not reach USPS" message: a transient
+                    # Akamai/edge 5xx (often an HTML block page, not JSON),
+                    # and a 403 refusal — which is not transient, not a
+                    # connectivity problem, and not a wrong password either.
+                    content_type, code, reason = await _refusal_summary(response)
+                    if response.status == 403:
+                        _LOGGER.warning(
+                            "USPS Informed Delivery: /authenticate round %s was "
+                            "refused with HTTP 403 (content type %s, code=%s, "
+                            "reason=%s) — USPS answered but would not run the "
+                            "sign-in; a JSON body is USPS's login service "
+                            "refusing the journey, HTML is its edge refusing "
+                            "the request. The credentials were not checked",
+                            round_number,
+                            content_type,
+                            code,
+                            reason,
+                        )
+                        raise USPSBlockedError(
+                            f"HTTP 403 ({content_type})", status_code=403
+                        )
                     _LOGGER.warning(
                         "USPS Informed Delivery: /authenticate round %s returned "
-                        "HTTP %s (non-401) — treating as a transient failure",
+                        "HTTP %s (non-401, content type %s) — treating as a "
+                        "transient failure",
                         round_number,
                         response.status,
+                        content_type,
                     )
                     raise USPSApiError(
                         f"HTTP {response.status}", status_code=response.status
@@ -632,7 +690,15 @@ class LoginJourney:
         raise USPSAuthError("Login journey did not complete")
 
     async def finish(self, token_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Exchange the completed journey's ``tokenId`` for tokens and profile."""
+        """Exchange a ``tokenId`` for tokens and profile.
+
+        ``token_id`` is the ForgeRock SSO session id. The interactive journey
+        produces it in :meth:`_advance`; the browser-session handoff takes it
+        straight from the user's signed-in browser cookie. Either way this
+        leg (``/oauth2/authorize`` + the code exchange) is the same, and it is
+        not behind the bot gate that blocks the journey's credential round.
+        """
+        await self._ensure_server()
         verifier, challenge = pkce_pair()
         params = {
             "client_id": CLIENT_ID,

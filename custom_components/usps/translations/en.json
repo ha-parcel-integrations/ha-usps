@@ -12,17 +12,14 @@
       },
       "informed_delivery": {
         "title": "Set up USPS Informed Delivery",
-        "description": "Sign in with the USPS account enrolled in Informed Delivery. Reauthentication may require an MFA code.",
+        "description": "USPS now blocks Home Assistant from signing in directly, so Informed Delivery is set up from a browser you have already signed in with.",
         "data": {
           "username": "USPS username or email",
-          "password": "Password"
-        }
-      },
-      "informed_delivery_challenge": {
-        "title": "Verify your USPS sign-in",
-        "description": "USPS needs one more step to finish signing in. USPS says:\n\n{prompt}",
-        "data": {
-          "answer": "Answer"
+          "session_token": "Browser session cookie"
+        },
+        "data_description": {
+          "username": "The account you signed in with; it labels this entry. On reauthentication, leave it as it is.",
+          "session_token": "Sign in at https://informeddelivery.usps.com, then in your browser's developer tools copy the value of the cookie named dfdc00f11bc995e stored for verified.usps.com and paste it here. It is exchanged once for a renewable token and is never stored."
         }
       },
       "user": {
@@ -46,9 +43,7 @@
       "not_enrolled": "No address on this USPS account is enrolled in Informed Delivery.",
       "tracking_not_enabled": "These credentials do not have the USPS Tracking product enabled.",
       "cannot_connect": "Could not reach USPS. Please try again.",
-      "too_many_challenges": "USPS asked for too many verification steps in a row. Please try signing in again.",
-      "invalid_code": "USPS did not accept that verification code. Sign in again to receive a new one.",
-      "push_approval_timeout": "USPS is waiting for you to approve this sign-in on your phone, but it timed out. Please try again and approve the prompt promptly."
+      "invalid_session": "That browser session could not be used to sign in. Make sure you are still signed in at informeddelivery.usps.com, then copy a fresh cookie value and try again."
     },
     "abort": {
       "already_configured": "USPS is already set up.",

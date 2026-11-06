@@ -13,7 +13,11 @@ from custom_components.usps.account.auth import (
     complete_login,
     exchange_refresh_token,
 )
-from custom_components.usps.api.client import USPSApiError, USPSAuthError
+from custom_components.usps.api.client import (
+    USPSApiError,
+    USPSAuthError,
+    USPSBlockedError,
+)
 
 
 def _ctx(response):
@@ -100,6 +104,35 @@ async def test_max_challenges_cap_trips_after_the_bound():
     journey.challenges_answered = MAX_CHALLENGES  # already at the bound
     with pytest.raises(USPSAuthError, match="Too many"):
         await journey.answer("123456")
+
+
+async def test_finish_without_start_fetches_serverinfo():
+    """The browser-session handoff builds a fresh journey and calls finish()
+    straight away (no start()), so finish() must resolve the session-cookie
+    name from /serverinfo itself."""
+    session = MagicMock()
+    session.get.side_effect = [
+        _ctx(_response(json={"realm": "/alpha", "cookieName": "sso-cookie"})),
+        _ctx(
+            _response(
+                status=302,
+                headers={
+                    "Location": "https://informeddelivery.usps.com/portal/callback?code=abc"
+                },
+            )
+        ),
+        _ctx(_response(json={"sub": "user", "addresses": []})),
+    ]
+    session.post.return_value = _ctx(
+        _response(json={"access_token": "access", "refresh_token": "refresh"})
+    )
+    journey = LoginJourney(session)
+    tokens, profile = await journey.finish("browser-sso-token")
+    assert tokens["refresh_token"] == "refresh"
+    assert profile["sub"] == "user"
+    # The pasted token is sent under the name /serverinfo reported.
+    authorize_cookies = session.get.call_args_list[1].kwargs["cookies"]
+    assert authorize_cookies == {"sso-cookie": "browser-sso-token"}
 
 
 async def test_authorize_missing_code_raises():
@@ -459,3 +492,72 @@ async def test_try_again_confirmation_is_a_rejection_not_a_question():
 
 def test_device_identifier_is_stable_across_journeys():
     assert LoginJourney(MagicMock())._device_id == LoginJourney(MagicMock())._device_id
+
+
+def _journey_refused_with(status, *, content_type, body=None, body_error=None):
+    """A session whose credentials round is answered with ``status``."""
+    session = MagicMock()
+    session.get.return_value = _ctx(
+        _response(json={"realm": "/alpha", "cookieName": "cookie"})
+    )
+    round0 = _response(
+        json={
+            "authId": "a1",
+            "callbacks": [
+                {"type": "NameCallback", "input": [{"value": ""}]},
+                {"type": "PasswordCallback", "input": [{"value": ""}]},
+            ],
+        }
+    )
+    refusal = MagicMock(status=status, headers={}, content_type=content_type)
+    refusal.json = AsyncMock(
+        side_effect=body_error,
+        return_value=body,
+    )
+    session.post.side_effect = [_ctx(round0), _ctx(refusal)]
+    return LoginJourney(session)
+
+
+async def test_403_on_the_credentials_round_is_a_blocked_error(caplog):
+    """Reported live (issue #12, two installations): the credentials round
+    comes back 403. That is USPS refusing the request, not a credential
+    rejection and not a connectivity failure, so it must not share
+    "could not reach USPS" with a transient 5xx."""
+    journey = _journey_refused_with(
+        403,
+        content_type="application/json",
+        body={"code": 403, "reason": "Forbidden", "message": "Access denied"},
+    )
+    with pytest.raises(USPSBlockedError) as err:
+        await journey.start("user@example.test", "secret")
+    assert err.value.status_code == 403
+    assert not isinstance(err.value, USPSAuthError)
+    log = caplog.text
+    assert "application/json" in log
+    assert "reason=Forbidden" in log
+    # The body a 403 echoes back can contain the submitted payload, so only
+    # ForgeRock's own code/reason are ever logged.
+    assert "Access denied" not in log
+
+
+async def test_403_with_an_html_edge_body_does_not_parse_it(caplog):
+    journey = _journey_refused_with(403, content_type="text/html")
+    with pytest.raises(USPSBlockedError):
+        await journey.start("user@example.test", "secret")
+    assert "text/html" in caplog.text
+    assert "code=None" in caplog.text
+
+
+async def test_403_with_an_unparseable_json_body_still_blocks():
+    journey = _journey_refused_with(
+        403, content_type="application/json", body_error=ValueError("not JSON")
+    )
+    with pytest.raises(USPSBlockedError):
+        await journey.start("user@example.test", "secret")
+
+
+async def test_non_403_refusal_stays_a_transient_api_error():
+    journey = _journey_refused_with(503, content_type="text/html")
+    with pytest.raises(USPSApiError) as err:
+        await journey.start("user@example.test", "secret")
+    assert not isinstance(err.value, USPSBlockedError)

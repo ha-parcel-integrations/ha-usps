@@ -16,6 +16,9 @@ CONF_CONSUMER_KEY = "consumer_key"
 CONF_CONSUMER_SECRET = "consumer_secret"
 CONF_USERNAME = "username"
 CONF_REFRESH_TOKEN = "refresh_token"
+# The ForgeRock SSO session cookie the user pastes from their signed-in
+# browser; traded once for the OAuth refresh token and never persisted.
+CONF_SESSION_TOKEN = "session_token"
 
 
 class ParcelStatus(StrEnum):
