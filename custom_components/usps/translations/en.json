@@ -12,7 +12,7 @@
       },
       "informed_delivery": {
         "title": "Set up USPS Informed Delivery",
-        "description": "USPS now blocks Home Assistant from signing in directly, so set up Informed Delivery from a browser you are already signed in with:\n\n1. Sign in at {login_site}.\n2. Open your browser's developer tools and go to Application → Cookies (Storage → Cookies in Firefox).\n3. Select {cookie_site}, find the cookie named {cookie_name}, and copy its value.\n4. Enter your USPS username below and paste that value. Copy it just before pasting — it is only valid briefly.",
+        "description": "USPS now blocks Home Assistant from signing in directly, so set up Informed Delivery from a browser you are already signed in with:\n\n1. Sign in at {login_site}.\n2. Open your browser's developer tools and go to Application → Cookies (Storage → Cookies in Firefox).\n3. Select {cookie_site}, find the cookie named {cookie_name}, and copy its value.\n4. Enter your USPS username below and paste that value. Copy it just before pasting — it is only valid briefly.\n\nStuck on step 2 or 3? See the [step-by-step instructions per browser]({docs_url}).",
         "data": {
           "username": "USPS username or email",
           "session_token": "Browser session cookie"

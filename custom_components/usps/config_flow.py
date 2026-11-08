@@ -44,6 +44,7 @@ from .const import (
     DEFAULT_DELIVERED_FILTER_TYPE,
     DEFAULT_INCLUDE_HISTORY,
     DOMAIN,
+    INFORMED_DELIVERY_COOKIE_DOCS_URL,
     SOURCE_API_TRACKING,
     SOURCE_INFORMED_DELIVERY,
 )
@@ -70,6 +71,7 @@ _INFORMED_PLACEHOLDERS = {
     "login_site": "informeddelivery.usps.com",
     "cookie_site": "verified.usps.com",
     "cookie_name": "dfdc00f11bc995e",
+    "docs_url": INFORMED_DELIVERY_COOKIE_DOCS_URL,
 }
 
 

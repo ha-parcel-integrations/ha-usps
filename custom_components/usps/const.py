@@ -114,6 +114,12 @@ INFORMED_DELIVERY_MAIL_URL = (
 INFORMED_DELIVERY_IMAGE_BASE_URL = (
     "https://apis-id.usps.com/informed-delivery-images/v2"
 )
+# User-facing help for copying the sign-in cookie, linked from the config flow
+# via a description placeholder (hassfest forbids a literal URL in a string).
+INFORMED_DELIVERY_COOKIE_DOCS_URL = (
+    "https://github.com/ha-parcel-integrations/ha-usps/blob/main/docs/"
+    "finding-the-session-cookie.md"
+)
 
 # Tracked parcels live in the config entry options as a list of
 # ``{tracking_code}`` dicts — this carrier has no account or parcel feed, so the
