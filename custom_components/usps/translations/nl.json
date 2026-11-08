@@ -12,7 +12,7 @@
       },
       "informed_delivery": {
         "title": "USPS Informed Delivery instellen",
-        "description": "USPS blokkeert nu dat Home Assistant rechtstreeks inlogt, dus Informed Delivery wordt ingesteld vanuit een browser waarin je al bent ingelogd. Log in op {login_site}, open daarna de ontwikkelaarstools van je browser, zoek de cookies die zijn opgeslagen voor {cookie_site} en kopieer de waarde van de cookie met de naam {cookie_name}.",
+        "description": "USPS blokkeert nu dat Home Assistant rechtstreeks inlogt, dus stel Informed Delivery in vanuit een browser waarin je al bent ingelogd:\n\n1. Log in op {login_site}.\n2. Open de ontwikkelaarstools van je browser en ga naar Application → Cookies (Opslag → Cookies in Firefox).\n3. Selecteer {cookie_site}, zoek de cookie met de naam {cookie_name} en kopieer de waarde.\n4. Vul hieronder je USPS-gebruikersnaam in en plak die waarde. Kopieer 'm vlak voor het plakken — hij is maar kort geldig.",
         "data": {
           "username": "USPS-gebruikersnaam of e-mail",
           "session_token": "Browser-sessiecookie"
