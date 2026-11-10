@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 import logging
 from typing import Any
 
@@ -39,6 +40,9 @@ class USPSData:
     # Both coordinators expose the same surface to the platforms, which are
     # typed against USPSCoordinator.
     coordinator: Any
+    # The options as last applied, so an entry write that only rotated the
+    # Informed Delivery tokens is not mistaken for an options edit.
+    options: Mapping[str, Any] = field(default_factory=dict)
 
 
 type USPSConfigEntry = ConfigEntry[USPSData]
@@ -98,7 +102,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     # it with backoff.
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = USPSData(client=client, coordinator=coordinator)
+    entry.runtime_data = USPSData(
+        client=client, coordinator=coordinator, options=dict(entry.options)
+    )
 
     if isinstance(coordinator, InformedDeliveryCoordinator):
         entry.async_on_unload(coordinator.async_start_keepalive())
@@ -119,8 +125,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: USPSConfigEntry) -> None:
-    """Apply changed options by refreshing the coordinator."""
-    await entry.runtime_data.coordinator.async_request_refresh()
+    """Apply changed options by refreshing the coordinator.
+
+    Every entry write notifies this listener, not just an options edit, and
+    the Informed Delivery keepalive persists its rotated token pair onto the
+    entry every ten minutes. Refreshing unconditionally therefore polled USPS
+    on that keepalive's cadence — through ``async_request_refresh``, which
+    bypasses the "Enable polling for updates" system option entirely.
+    """
+    data = entry.runtime_data
+    if entry.options == data.options:
+        return
+    data.options = dict(entry.options)
+    await data.coordinator.async_request_refresh()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool:

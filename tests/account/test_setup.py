@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.usps.api.client import USPSAuthError
 from custom_components.usps.const import (
+    CONF_INCLUDE_HISTORY,
     CONF_REFRESH_TOKEN,
     CONF_SOURCE,
     DOMAIN,
@@ -136,3 +137,58 @@ async def test_setup_retries_when_the_renewal_cannot_reach_usps(hass):
         assert not await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_token_rotation_does_not_count_as_an_options_edit(hass):
+    """A keepalive token write must not poll — the user may have polling off.
+
+    Every ``async_update_entry`` notifies the entry's update listener, and the
+    keepalive rotates tokens onto the entry every ten minutes. Refreshing on
+    that notification polled USPS through ``async_request_refresh``, which
+    ignores Home Assistant's "Enable polling for updates" system option.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_SOURCE: SOURCE_INFORMED_DELIVERY,
+            "access_token": "access",
+            CONF_REFRESH_TOKEN: "refresh",
+            "addresses": [{"zip11": "12345678901"}],
+        },
+    )
+    entry.add_to_hass(hass)
+    with (
+        patch(
+            "custom_components.usps.account.client.exchange_refresh_token",
+            new=AsyncMock(
+                return_value={"access_token": "fresh", "refresh_token": "rotated"}
+            ),
+        ),
+        patch(
+            "custom_components.usps.account.client.InformedDeliveryClient.async_get_mail_pieces",
+            new=AsyncMock(return_value={"mailpieces": []}),
+        ),
+        patch(
+            "custom_components.usps.account.client.InformedDeliveryClient.async_get_packages",
+            new=AsyncMock(return_value=[]),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        refresh = AsyncMock()
+        with patch.object(
+            entry.runtime_data.coordinator, "async_request_refresh", new=refresh
+        ):
+            hass.config_entries.async_update_entry(
+                entry,
+                data={**entry.data, "access_token": "rotated-again"},
+            )
+            await hass.async_block_till_done()
+            assert refresh.call_count == 0
+
+            hass.config_entries.async_update_entry(
+                entry, options={**entry.options, CONF_INCLUDE_HISTORY: True}
+            )
+            await hass.async_block_till_done()
+            assert refresh.call_count == 1

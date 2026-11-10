@@ -166,8 +166,17 @@ decisions. Changes apply without a restart. Two models, **do not mix them**:
   added/removed parcel sensors appear immediately (this is also the resume
   path after polling has fully suspended — see "Dynamic polling" below).
 - **Account-based carriers** call `async_schedule_reload` on submit and register
-  **no** update listener. Combining a listener with a reload-on-update flow is
-  deprecated, an error in HA 2026.12+.
+  **no** update listener. Combining a listener with a reload-on-update flow
+  is deprecated, an error in HA 2026.12+.
+
+**`_async_options_updated` must compare `entry.options` before refreshing**
+(against the snapshot on `runtime_data`). HA notifies an update listener on
+*every* `async_update_entry`, not just an options edit, and the Informed
+Delivery keepalive persists its rotated token pair every ten minutes — so an
+unconditional `async_request_refresh()` polled USPS on the keepalive's
+cadence, straight past HA's "Enable polling for updates" system option, which
+only gates the coordinator's *scheduled* refresh (#14). Any new entry write
+from the coordinator inherits this; don't drop the comparison.
 
 ## Auth models
 

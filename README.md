@@ -136,6 +136,15 @@ and only API Tracking entries can run out of parcels to track:
 - A small, fixed per-hub offset is added on top, so not every USPS hub out
   there polls at exactly the same second.
 
+If you'd rather check on your own schedule, switch **Enable polling for
+updates** off under **Settings → Devices & Services → USPS → ⋮ → System
+options**. The scheduled checks then stop entirely, and you decide when to
+look: press the **Refresh** button, or call `homeassistant.update_entity` from
+an automation as often as you like. An Informed Delivery entry still renews
+its sign-in with USPS every ten minutes in the background — that's what keeps
+the entry from needing a new session cookie — but it fetches no packages or
+mail while polling is off.
+
 ## Removal
 
 Standard HA removal applies: **Settings → Devices & Services → USPS → ⋮ → Delete**. Nothing is stored on USPS's side.
