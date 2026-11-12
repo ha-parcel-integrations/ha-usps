@@ -1,6 +1,7 @@
 """Tests for non-secret Informed Delivery auth helpers."""
 
 import json
+import logging
 
 import pytest
 
@@ -394,3 +395,46 @@ def test_enrolled_addresses_skips_unusable_zip_and_malformed_profiles():
         )
         == []
     )
+
+
+def test_enrolled_addresses_warns_with_the_profile_shape_when_nothing_is_enrolled(
+    caplog,
+):
+    """Setup fails before an entry exists, so the user cannot enable debug
+    logging — the shape that explains it must reach the log at WARNING."""
+    with caplog.at_level(logging.WARNING):
+        assert (
+            enrolled_addresses(
+                {"sub": "x", "addresses": [{"ZIPCode": "12345"}, "nope"]}
+            )
+            == []
+        )
+    assert "no RMIN-enrolled address" in caplog.text
+    assert "profile keys=['addresses', 'sub']" in caplog.text
+    assert "keys=['ZIPCode'] granted_services=[]" in caplog.text
+    assert "<str>" in caplog.text
+
+
+def test_enrolled_addresses_warns_which_zip_parts_are_missing(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert (
+            enrolled_addresses(
+                {
+                    "addresses": [
+                        {
+                            "ZIPCode": "12345",
+                            "ZIPPlus4": "",
+                            "granted_services": ["RMIN"],
+                        }
+                    ]
+                }
+            )
+            == []
+        )
+    assert "missing or empty: ZIPPlus4, deliveryPoint" in caplog.text
+
+
+def test_enrolled_addresses_warns_when_addresses_is_not_a_list(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert enrolled_addresses({"addresses": "nope"}) == []
+    assert "'addresses' is str, not a list" in caplog.text

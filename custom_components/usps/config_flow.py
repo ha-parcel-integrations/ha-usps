@@ -20,7 +20,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .account.auth import LoginJourney, enrolled_addresses, granted_services
+from .account.auth import LoginJourney, enrolled_addresses
 from .account.session import async_new_informed_delivery_session
 from .api.client import (
     ApiTrackingClient,
@@ -222,18 +222,10 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
         tokens, profile = await journey.finish(token_id)
         addresses = enrolled_addresses(profile)
         if not addresses:
-            all_services = sorted(
-                {
-                    service
-                    for address in profile.get("addresses", []) or []
-                    if isinstance(address, dict)
-                    for service in granted_services(address)
-                }
-            )
+            # enrolled_addresses() has already logged the profile shape at WARNING.
             _LOGGER.debug(
                 "USPS Informed Delivery setup: login succeeded but no RMIN-enrolled "
-                "address was found (granted_services seen: %s)",
-                all_services,
+                "address was found"
             )
             return self.async_show_form(
                 step_id=SOURCE_INFORMED_DELIVERY,

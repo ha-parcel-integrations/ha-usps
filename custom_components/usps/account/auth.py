@@ -416,29 +416,45 @@ def enrolled_addresses(profile: dict[str, Any]) -> list[dict[str, str]]:
     """Return only RMIN-enrolled address records; never expose ZIP11 as an ID."""
     raw = profile.get("addresses")
     result = []
+    shapes = []
     for address in raw if isinstance(raw, list) else []:
         if not isinstance(address, dict):
+            shapes.append(f"<{type(address).__name__}>")
             continue
         services = granted_services(address)
         # Key names and service names only — never ZIP or street values.
-        _LOGGER.debug(
-            "USPS Informed Delivery: /userinfo address keys=%s granted_services=%s",
-            sorted(address.keys()),
-            services,
-        )
+        shape = f"keys={sorted(address.keys())} granted_services={services}"
+        shapes.append(shape)
+        _LOGGER.debug("USPS Informed Delivery: /userinfo address %s", shape)
         if "RMIN" not in services:
             continue
         zip11 = _compose_zip11(address)
         if len(zip11) == 11 and zip11.isdigit():
             result.append({"zip11": zip11})
         else:
+            missing = [
+                key
+                for key in ("ZIPCode", "ZIPPlus4", "deliveryPoint")
+                if str(address.get(key) or "").strip() == ""
+            ]
             _LOGGER.warning(
-                "USPS Informed Delivery: skipping an enrolled address without a usable 11-digit ZIP"
+                "USPS Informed Delivery: skipping an enrolled address without a usable "
+                "11-digit ZIP (composed %s digit(s); missing or empty: %s)",
+                len(zip11),
+                ", ".join(missing) or "none",
             )
     if not result:
-        _LOGGER.debug(
-            "USPS Informed Delivery: /userinfo top-level keys=%s",
+        # A user hitting this cannot turn on debug logging — the entry does not
+        # exist yet — so the shape that explains it has to come out at WARNING.
+        if isinstance(raw, list):
+            detail = "; ".join(shapes) if shapes else "the address list is empty"
+        else:
+            detail = f"'addresses' is {type(raw).__name__}, not a list"
+        _LOGGER.warning(
+            "USPS Informed Delivery: no RMIN-enrolled address in /userinfo — "
+            "profile keys=%s, %s",
             sorted(profile.keys()),
+            detail,
         )
     return result
 
