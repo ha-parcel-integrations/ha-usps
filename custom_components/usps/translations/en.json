@@ -40,7 +40,7 @@
     },
     "error": {
       "invalid_auth": "USPS rejected these credentials.",
-      "not_enrolled": "No address on this USPS account is enrolled in Informed Delivery.",
+      "not_enrolled": "This USPS account has no address Informed Delivery can be read for.",
       "tracking_not_enabled": "These credentials do not have the USPS Tracking product enabled.",
       "cannot_connect": "Could not reach USPS. Please try again.",
       "invalid_session": "That browser session could not be used to sign in. Make sure you are still signed in to USPS Informed Delivery, then copy a fresh cookie value and try again."

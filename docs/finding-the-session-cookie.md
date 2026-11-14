@@ -70,6 +70,7 @@ Assistant within a minute or two.
   value wasn't a live session: you were signed out, copied the wrong cookie, or
   it expired between copying and pasting. Sign in again at
   informeddelivery.usps.com, copy a fresh value, and paste it straight away.
-- **Home Assistant says no address is enrolled in Informed Delivery.** The
-  sign-in worked, but the account has no enrolled address. Enroll one at
-  informeddelivery.usps.com first, then set up the integration.
+- **Home Assistant says the account has no address Informed Delivery can be
+  read for.** The sign-in worked, but USPS returned no usable address. Enroll
+  one at informeddelivery.usps.com first and check that it shows your mail and
+  packages there, then set up the integration.

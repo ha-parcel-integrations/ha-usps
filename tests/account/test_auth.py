@@ -409,7 +409,7 @@ def test_enrolled_addresses_warns_with_the_profile_shape_when_nothing_is_enrolle
             )
             == []
         )
-    assert "no RMIN-enrolled address" in caplog.text
+    assert "no usable address in /userinfo" in caplog.text
     assert "profile keys=['addresses', 'sub']" in caplog.text
     assert "keys=['ZIPCode'] granted_services=[]" in caplog.text
     assert "<str>" in caplog.text
@@ -432,6 +432,50 @@ def test_enrolled_addresses_warns_which_zip_parts_are_missing(caplog):
             == []
         )
     assert "missing or empty: ZIPPlus4, deliveryPoint" in caplog.text
+
+
+def test_enrolled_addresses_falls_back_when_no_address_carries_rmin(caplog):
+    """USPS reported an address whose dashboard shows packages as ESOF/MYPOST
+    with no RMIN (#16) — an account with no RMIN address at all is used as-is
+    rather than rejected, because the service vocabulary cannot be enumerated."""
+    with caplog.at_level(logging.WARNING):
+        assert enrolled_addresses(
+            {
+                "addresses": [
+                    {
+                        "ZIPCode": "12345",
+                        "ZIPPlus4": "6789",
+                        "deliveryPoint": "1",
+                        "granted_services": ["ESOF", "MYPOST"],
+                    }
+                ]
+            }
+        ) == [{"zip11": "12345678901"}]
+    assert "no address in /userinfo carries the RMIN service" in caplog.text
+    assert "services=['ESOF', 'MYPOST']" in caplog.text
+
+
+def test_enrolled_addresses_prefers_rmin_over_the_fallback(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert enrolled_addresses(
+            {
+                "addresses": [
+                    {
+                        "ZIPCode": "12345",
+                        "ZIPPlus4": "6789",
+                        "deliveryPoint": "01",
+                        "granted_services": ["RMIN"],
+                    },
+                    {
+                        "ZIPCode": "22222",
+                        "ZIPPlus4": "3333",
+                        "deliveryPoint": "44",
+                        "granted_services": ["ESOF"],
+                    },
+                ]
+            }
+        ) == [{"zip11": "12345678901"}]
+    assert "carries the RMIN service" not in caplog.text
 
 
 def test_enrolled_addresses_warns_when_addresses_is_not_a_list(caplog):

@@ -224,7 +224,7 @@ class USPSConfigFlow(ConfigFlow, domain=DOMAIN):
         if not addresses:
             # enrolled_addresses() has already logged the profile shape at WARNING.
             _LOGGER.debug(
-                "USPS Informed Delivery setup: login succeeded but no RMIN-enrolled "
+                "USPS Informed Delivery setup: login succeeded but no usable "
                 "address was found"
             )
             return self.async_show_form(

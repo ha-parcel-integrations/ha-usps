@@ -413,9 +413,16 @@ def _compose_zip11(address: dict[str, Any]) -> str:
 
 
 def enrolled_addresses(profile: dict[str, Any]) -> list[dict[str, str]]:
-    """Return only RMIN-enrolled address records; never expose ZIP11 as an ID."""
+    """Return the account's usable address records; never expose ZIP11 as an ID."""
     raw = profile.get("addresses")
-    result = []
+    enrolled: list[dict[str, str]] = []
+    # USPS does not report enrolment under one fixed service name: an address
+    # whose dashboard shows packages came back as ESOF/MYPOST without RMIN
+    # (#16). The vocabulary is undocumented and cannot be enumerated, so an
+    # account with no RMIN address falls back to every address it does have
+    # rather than being rejected outright.
+    fallback: list[dict[str, str]] = []
+    fallback_services: set[str] = set()
     shapes = []
     for address in raw if isinstance(raw, list) else []:
         if not isinstance(address, dict):
@@ -426,37 +433,49 @@ def enrolled_addresses(profile: dict[str, Any]) -> list[dict[str, str]]:
         shape = f"keys={sorted(address.keys())} granted_services={services}"
         shapes.append(shape)
         _LOGGER.debug("USPS Informed Delivery: /userinfo address %s", shape)
-        if "RMIN" not in services:
-            continue
         zip11 = _compose_zip11(address)
-        if len(zip11) == 11 and zip11.isdigit():
-            result.append({"zip11": zip11})
+        if len(zip11) != 11 or not zip11.isdigit():
+            if "RMIN" in services:
+                missing = [
+                    key
+                    for key in ("ZIPCode", "ZIPPlus4", "deliveryPoint")
+                    if str(address.get(key) or "").strip() == ""
+                ]
+                _LOGGER.warning(
+                    "USPS Informed Delivery: skipping an enrolled address without a "
+                    "usable 11-digit ZIP (composed %s digit(s); missing or empty: %s)",
+                    len(zip11),
+                    ", ".join(missing) or "none",
+                )
+            continue
+        if "RMIN" in services:
+            enrolled.append({"zip11": zip11})
         else:
-            missing = [
-                key
-                for key in ("ZIPCode", "ZIPPlus4", "deliveryPoint")
-                if str(address.get(key) or "").strip() == ""
-            ]
-            _LOGGER.warning(
-                "USPS Informed Delivery: skipping an enrolled address without a usable "
-                "11-digit ZIP (composed %s digit(s); missing or empty: %s)",
-                len(zip11),
-                ", ".join(missing) or "none",
-            )
-    if not result:
-        # A user hitting this cannot turn on debug logging — the entry does not
-        # exist yet — so the shape that explains it has to come out at WARNING.
-        if isinstance(raw, list):
-            detail = "; ".join(shapes) if shapes else "the address list is empty"
-        else:
-            detail = f"'addresses' is {type(raw).__name__}, not a list"
+            fallback.append({"zip11": zip11})
+            fallback_services.update(services)
+    if enrolled:
+        return enrolled
+    if fallback:
         _LOGGER.warning(
-            "USPS Informed Delivery: no RMIN-enrolled address in /userinfo — "
-            "profile keys=%s, %s",
-            sorted(profile.keys()),
-            detail,
+            "USPS Informed Delivery: no address in /userinfo carries the RMIN "
+            "service, using the %s address(es) it does list (services=%s). If this "
+            "account is not enrolled, polling will simply return nothing.",
+            len(fallback),
+            sorted(fallback_services),
         )
-    return result
+        return fallback
+    # A user hitting this cannot turn on debug logging — the entry does not
+    # exist yet — so the shape that explains it has to come out at WARNING.
+    if isinstance(raw, list):
+        detail = "; ".join(shapes) if shapes else "the address list is empty"
+    else:
+        detail = f"'addresses' is {type(raw).__name__}, not a list"
+    _LOGGER.warning(
+        "USPS Informed Delivery: no usable address in /userinfo — profile keys=%s, %s",
+        sorted(profile.keys()),
+        detail,
+    )
+    return []
 
 
 async def exchange_refresh_token(

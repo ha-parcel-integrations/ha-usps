@@ -40,7 +40,7 @@
     },
     "error": {
       "invalid_auth": "USPS heeft deze gegevens geweigerd.",
-      "not_enrolled": "Geen adres op dit USPS-account is ingeschreven voor Informed Delivery.",
+      "not_enrolled": "Dit USPS-account heeft geen adres waarvoor Informed Delivery gelezen kan worden.",
       "tracking_not_enabled": "Deze gegevens hebben USPS Tracking niet ingeschakeld.",
       "cannot_connect": "Kon USPS niet bereiken. Probeer het opnieuw.",
       "invalid_session": "Die browsersessie kon niet worden gebruikt om in te loggen. Zorg dat je nog bent ingelogd bij USPS Informed Delivery, kopieer dan een verse cookiewaarde en probeer opnieuw."

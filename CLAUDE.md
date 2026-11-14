@@ -50,15 +50,27 @@ Key/Secret and caches only its access token in memory. It follows user-entered
 codes and therefore owns the parcel editor and global services.
 
 Informed Delivery stores no password. It stores the rotating refresh token and
-the current access token, discovers packages and mail only from RMIN-enrolled addresses,
-and never accepts manual parcel mutation. Its five-minute access token and
-fifteen-minute rotating refresh chain require a ten-minute runtime cadence;
+the current access token, discovers packages and mail from the addresses
+`/userinfo` returns, and never accepts manual parcel mutation. Its five-minute
+access token and fifteen-minute rotating refresh chain require a ten-minute
+runtime cadence;
 after a sufficiently long Home Assistant outage it must reauthenticate.
 Every refresh persists **both** tokens, and setup renews the chain
 (`async_restore_session`) before the first poll: the stored access token is
 five minutes old at best, so a restart that polls on it leaves "expired or
 revoked?" to USPS's 401 body, and a normal restart then reads as a dead
 session.
+
+**Enrolment is not reported under one fixed service name.** `granted_services`
+containing `RMIN` is the known marker, but an address whose Informed Delivery
+dashboard shows packages came back as `ESOF`/`MYPOST` with no `RMIN` (#16), and
+the vocabulary is undocumented. So `enrolled_addresses` prefers `RMIN`
+addresses and, when *no* address carries it, falls back to every address with a
+composable ZIP11 — logging a WARNING with the service names it accepted. Don't
+turn that back into a strict allowlist: an unenrolled account simply polls
+empty, while a wrong allowlist locks out an enrolled one at setup with no way
+round it. The mixed case deliberately keeps the `RMIN` subset, so a dud address
+never joins the poll of an account that has a good one.
 
 **Sign-in is a browser-session handoff, not an in-HA login.** USPS put Akamai
 Bot Manager in front of the interactive sign-in's credential round: a native
