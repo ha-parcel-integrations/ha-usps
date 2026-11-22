@@ -7,7 +7,12 @@ import logging
 import re
 from typing import Any
 
-from ..api.parcels import NEW_ISSUE_URL, tracking_url
+from ..api.parcels import (
+    NEW_ISSUE_URL,
+    planned_for_status,
+    planned_window,
+    tracking_url,
+)
 from ..const import ParcelStatus
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,19 +69,6 @@ def map_informed_delivery_status(code: str | None) -> ParcelStatus:
     return ParcelStatus.UNKNOWN
 
 
-def _local_day(value: Any, tz: tzinfo, *, end: bool = False) -> str | None:
-    if not value:
-        return None
-    try:
-        return datetime.combine(
-            datetime.fromisoformat(str(value)).date(),
-            time.max if end else time.min,
-            tzinfo=tz,
-        ).isoformat()
-    except ValueError:
-        return None
-
-
 def _clock(hour: str, minute: str | None, meridiem: str) -> time | None:
     h, m = int(hour), int(minute or 0)
     if not 1 <= h <= 12 or m > 59:
@@ -105,15 +97,18 @@ def _planned_window(
     value: Any, text2: Any, tz: tzinfo
 ) -> tuple[str | None, str | None]:
     start, end = _text2_window(text2)
-    if not value or (start is None and end is None):
-        return _local_day(value, tz), _local_day(value, tz, end=True)
+    if not value:
+        return None, None
     try:
         day = datetime.fromisoformat(str(value)).date()
     except ValueError:
         return None, None
-    return (
-        datetime.combine(day, start or time.min, tzinfo=tz).isoformat(),
-        datetime.combine(day, end or time.max, tzinfo=tz).isoformat(),
+    if start is None and end is None:
+        return planned_window(day, None, zone=tz)
+    return planned_window(
+        datetime.combine(day, start or time.min, tzinfo=tz),
+        datetime.combine(day, end or time(23, 59, 59), tzinfo=tz),
+        zone=tz,
     )
 
 
@@ -146,10 +141,8 @@ def normalize_informed_delivery_parcel(
     delivered = status is ParcelStatus.DELIVERED
     barcode = raw.get("trackingNumber")
     delivery_date = info.get("deliveryDate") or raw.get("expectedDeliveryDate")
-    planned_from, planned_to = (
-        (None, None)
-        if delivered
-        else _planned_window(delivery_date, info.get("text2"), tz)
+    planned_from, planned_to = planned_for_status(
+        status, *_planned_window(delivery_date, info.get("text2"), tz)
     )
     return {
         "carrier": "USPS",
@@ -164,7 +157,7 @@ def normalize_informed_delivery_parcel(
         else None,
         "planned_from": planned_from,
         "planned_to": planned_to,
-        "pickup": None,
+        "pickup": False,
         "pickup_point": None,
         "url": tracking_url(barcode),
         "weight": None,

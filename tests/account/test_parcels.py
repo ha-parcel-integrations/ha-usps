@@ -269,7 +269,7 @@ def test_unusable_between_window_falls_back_to_the_whole_day(text2):
         }
     )
     assert parcel["planned_from"] == "2026-09-24T00:00:00-04:00"
-    assert parcel["planned_to"] == "2026-09-24T23:59:59.999999-04:00"
+    assert parcel["planned_to"] == "2026-09-24T23:59:59-04:00"
 
 
 @pytest.mark.parametrize(
@@ -286,7 +286,7 @@ def test_planned_to_falls_back_to_end_of_day(text2):
             },
         }
     )
-    assert parcel["planned_to"] == "2026-09-28T23:59:59.999999-04:00"
+    assert parcel["planned_to"] == "2026-09-28T23:59:59-04:00"
 
 
 def test_by_time_without_a_parseable_date_is_none():

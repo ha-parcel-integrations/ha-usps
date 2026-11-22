@@ -35,12 +35,14 @@ you act in one of these areas:
   summary+diagnostic sensors. Add a new non-parcel sensor's unique_id to the set.
 - **Per-parcel sensors are removed by the summary sensor** via
   `entity_registry.async_remove` (self-removal races and leaves ghosts).
-- **If this carrier can reach `ParcelStatus.AT_PICKUP_POINT` from a real raw
-  status/code**, it needs an `awaiting_pickup` sensor — see *Parcel contract*
-  in `CONVENTIONS.md`. Say "pickup point", not "ServicePoint"/"parcel
-  shop"/"locker", for the generic concept. `ha-dhl-nl`, `ha-dpd`, `ha-gls`,
-  `ha-inpost` are reference implementations; `usps` here does not
-  demonstrate it yet.
+- **The pickup-point summaries are a pair.** A carrier that can deliver to a
+  pickup point or locker exposes both `en_route_to_pickup_point` and
+  `awaiting_pickup`, even before a real parcel has shown the status or flag
+  (they read 0 until then; record it in `PENDING_*`). A carrier without pickup
+  points exposes neither and keeps `pickup` constantly False.
+  See *Parcel contract* in `CONVENTIONS.md`. Say "pickup point", not
+  "ServicePoint"/"parcel shop"/"locker", for the generic concept; the
+  example carrier demonstrates both canonical sensors.
 
 ## Carrier-specific notes
 
@@ -155,13 +157,25 @@ the poll that discovered it.
 Outgoing parcels are not supported.
 
 Both sources deliberately return `None` for weight, dimensions and pickup
-point data. API Tracking alone can expose structured history; Informed Delivery
+point name. API Tracking alone can expose structured history; Informed Delivery
 alone can expose a delivery window: `deliveryDate` as the day, narrowed by
 `text2` when it parses — `by 9:00pm` sets `planned_to`, `between 1:00pm and
-3:00pm` sets both ends — and the whole day otherwise. Package times
-(`eventTimestamp`, `deliveryDate`, the `text2` window) are naive and local to
-the enrolled address, so they are read in Home Assistant's time zone; only the
-`packages/search` request date is US Eastern. Diagnostics redact all credentials, tokens,
+3:00pm` sets both ends — and the whole day (`00:00:00`–`23:59:59`) otherwise.
+Windows go through `planned_window` and are emptied by `planned_for_status`.
+Package times (`eventTimestamp`, `deliveryDate`, the `text2` window) are naive
+and local to the enrolled address, so they are read in Home Assistant's time
+zone; only the `packages/search` request date is US Eastern.
+
+**Pickup.** USPS can hold a parcel at a post office, so both `awaiting_pickup`
+and `en_route_to_pickup_point` exist on every entry. API Tracking sets `pickup`
+from `is_pickup` (the parcel reached `AT_PICKUP_POINT` in its events, sticky
+after collection); it has no structured route field and never names the point,
+so `pickup_point` stays `None`. Informed Delivery has no pickup status, so its
+`pickup` is a constant `False`. Pending: the API's pickup wording
+(`_STATUS_PREFIXES`) has not been seen on a real parcel, so both sensors read 0
+until it is.
+
+Diagnostics redact all credentials, tokens,
 ZIP11 data, tracking codes and raw package identifiers.
 
 ## Options and reloads

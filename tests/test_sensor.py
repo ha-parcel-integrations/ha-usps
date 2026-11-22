@@ -12,6 +12,7 @@ from custom_components.usps.const import DOMAIN, ParcelStatus
 from custom_components.usps.sensor import (
     USPSAwaitingPickupSensor,
     USPSDeliveredParcelsSensor,
+    USPSEnRouteToPickupPointSensor,
     USPSIncomingParcelsSensor,
     USPSLastUpdateSensor,
     USPSNextDeliverySensor,
@@ -139,12 +140,12 @@ def test_parcel_sensor_is_none_while_its_parcel_is_missing():
 def test_next_delivery_picks_the_earliest_moment():
     coordinator = _coordinator(
         [
-            _parcel("A", planned_from="2026-05-02T10:00:00Z"),
-            _parcel("B", planned_from="2026-05-01T10:00:00Z"),
+            _parcel("A", planned_from="2099-05-02T10:00:00Z"),
+            _parcel("B", planned_from="2099-05-01T10:00:00Z"),
         ]
     )
     sensor = USPSNextDeliverySensor(coordinator, _entry())
-    assert sensor.native_value == datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
+    assert sensor.native_value == datetime(2099, 5, 1, 10, 0, tzinfo=UTC)
     assert sensor.extra_state_attributes["barcode"] == "B"
 
 
@@ -158,7 +159,7 @@ def test_next_delivery_skips_an_unparseable_moment():
     coordinator = _coordinator(
         [
             _parcel("A", planned_from="not-a-date"),
-            _parcel("B", planned_from="2026-05-01T10:00:00Z"),
+            _parcel("B", planned_from="2099-05-01T10:00:00Z"),
         ]
     )
     sensor = USPSNextDeliverySensor(coordinator, _entry())
@@ -201,3 +202,30 @@ def test_last_update_sensor_reports_the_last_successful_poll():
     coordinator.last_success_time = moment
     sensor = USPSLastUpdateSensor(coordinator, _entry())
     assert sensor.native_value == moment
+
+
+def test_next_delivery_skips_a_window_that_has_ended():
+    stale = _parcel("OLD", planned_from="2020-05-01T10:00:00Z")
+    stale["planned_to"] = "2020-05-01T23:59:59Z"
+    coordinator = _coordinator(
+        [stale, _parcel("NEW", planned_from="2099-05-01T10:00:00Z")]
+    )
+    sensor = USPSNextDeliverySensor(coordinator, _entry())
+    assert sensor.extra_state_attributes["barcode"] == "NEW"
+
+
+def test_en_route_to_pickup_point_excludes_arrived_and_returning_parcels():
+    en_route = {**_parcel("GO"), "pickup": True}
+    arrived = {**_parcel("HELD", ParcelStatus.AT_PICKUP_POINT), "pickup": True}
+    returning = {**_parcel("BACK", ParcelStatus.RETURNING), "pickup": True}
+    home = _parcel("HOME") | {"pickup": False}
+    coordinator = _coordinator([en_route, arrived, returning, home])
+    sensor = USPSEnRouteToPickupPointSensor(coordinator, _entry())
+    assert sensor.unique_id == "cfg_en_route_to_pickup_point"
+    assert sensor.extra_state_attributes == {"parcels": [en_route]}
+    assert sensor.native_value == 1
+    awaiting = USPSAwaitingPickupSensor(coordinator, _entry())
+    assert not {p["barcode"] for p in awaiting._parcels()} & {"GO"}
+    assert (
+        USPSEnRouteToPickupPointSensor(_coordinator(None), _entry()).native_value == 0
+    )
