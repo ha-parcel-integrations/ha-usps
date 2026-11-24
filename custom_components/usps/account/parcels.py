@@ -149,6 +149,7 @@ def normalize_informed_delivery_parcel(
         "barcode": barcode,
         "sender": raw.get("shipperName") or None,
         "receiver": None,
+        "contents": None,
         "status": status,
         "raw_status": info.get("status") or category,
         "delivered": delivered,

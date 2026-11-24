@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.usps import async_unload_entry
@@ -19,6 +20,7 @@ async def test_unloading_informed_delivery_keeps_services_for_api_tracking(hass)
     inbox = MockConfigEntry(domain=DOMAIN, data={CONF_SOURCE: SOURCE_INFORMED_DELIVERY})
     api.add_to_hass(hass)
     inbox.add_to_hass(hass)
+    api.mock_state(hass, ConfigEntryState.LOADED)
     async_setup_services(hass)
     with patch.object(
         hass.config_entries, "async_unload_platforms", new=AsyncMock(return_value=True)

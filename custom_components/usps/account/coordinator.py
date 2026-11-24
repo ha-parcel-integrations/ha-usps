@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from ..api.client import USPSApiError, USPSAuthError
 from ..const import CONF_REFRESH_TOKEN, DOMAIN, ParcelStatus
+from ..contents import ContentsStore, normalize_code
 from .client import InformedDeliveryClient, InformedDeliveryTokenExpired
 from .letters import extract_mail_pieces, merge_mail_pieces
 from .parcels import normalize_informed_delivery_parcel
@@ -51,6 +52,10 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             update_interval=timedelta(minutes=10),
         )
         self._client = client
+        self.contents_store = ContentsStore(hass, entry.entry_id)
+        # Every code this entry lists, delivered ones included: update_contents
+        # asks which entry a code belongs to.
+        self.known_codes: frozenset[str] = frozenset()
         self.delivered: list[dict[str, Any]] = []
         self._current_tier_minutes = 10
         self._delivered_codes: set[str] = set()
@@ -252,11 +257,17 @@ class InformedDeliveryCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if code:
                 seen.add(code)
                 first_by_code[code] = row
-            parcels.append(
-                normalize_informed_delivery_parcel(
-                    row, tz=dt_util.get_default_time_zone()
-                )
+            parcel = normalize_informed_delivery_parcel(
+                row, tz=dt_util.get_default_time_zone()
             )
+            if code:
+                user_value = self.contents_store.get(code)
+                if user_value is not None:
+                    parcel["contents"] = user_value
+            parcels.append(parcel)
+        self.known_codes = frozenset(
+            normalize_code(parcel["barcode"]) for parcel in parcels if parcel["barcode"]
+        )
         self.delivered = [parcel for parcel in parcels if parcel["delivered"]]
         self._last_good = [parcel for parcel in parcels if not parcel["delivered"]]
         self._fire_change_events(self._last_good + self.delivered)

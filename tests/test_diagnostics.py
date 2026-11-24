@@ -54,6 +54,11 @@ async def test_entry_diagnostics_redact_entry_data(hass):
     assert diagnostics["entry_data"]["refresh_token"] == "**REDACTED**"
 
 
+def test_diagnostics_redact_the_contents_text():
+    redacted = async_redact_data({"contents": "Running shoes"}, TO_REDACT)
+    assert redacted["contents"] == "**REDACTED**"
+
+
 def test_diagnostics_redact_the_informed_delivery_address():
     data = {
         "addresses": [{"zip11": "12345678901"}],

@@ -49,6 +49,7 @@ Each config entry uses one source; you can add both.
 - Informed Delivery also announces the **letter mail** on its way, with the scan of each envelope as an image entity
 - Read-only **Deliveries** calendar with the expected delivery days
 - `usps.track_parcel` / `usps.untrack_parcel` services (API Tracking), so a dashboard button can add a parcel
+- A `contents` note on each parcel, set with `usps.update_contents` or the `contents` field of `usps.track_parcel`; it titles the parcel's calendar event and shows on the next-delivery sensor
 - Events + device triggers for no-code automations (parcel registered, status changed, delivered, delivery time changed, mail announced)
 - Opt-in per-parcel status history
 - Manual refresh button and a diagnostic last-update sensor
@@ -217,8 +218,13 @@ Every parcel payload is the full normalised parcel plus the hub's `device_id`; `
 
 | Service | Fields | Description |
 |---|---|---|
-| `usps.track_parcel` | `tracking_code`, optional `entry_id` | Start tracking through an API Tracking entry |
+| `usps.track_parcel` | `tracking_code`, optional `entry_id`, optional `contents` | Start tracking through an API Tracking entry, optionally noting what is in the parcel |
 | `usps.untrack_parcel` | `tracking_code`, optional `entry_id` | Stop tracking through an API Tracking entry |
+| `usps.update_contents` | `tracking_code`, `contents`, optional `entry_id` | Set what is in a parcel, tracked or not; an empty `contents` clears it. It goes to every entry that lists the code; name one with `entry_id` (needed for a code none lists yet). |
+
+`track_parcel` and `untrack_parcel` act on an API Tracking entry only and are not registered while only Informed Delivery is set up. `update_contents` works with any set-up entry.
+
+The `contents` text you set titles the parcel's calendar event and shows on the next-delivery sensor.
 
 ## Examples
 

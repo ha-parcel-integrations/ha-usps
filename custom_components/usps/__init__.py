@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -22,11 +22,13 @@ from .const import (
     CONF_CONSUMER_SECRET,
     CONF_REFRESH_TOKEN,
     CONF_SOURCE,
+    DOMAIN,
     INFORMED_DELIVERY_PLATFORMS,
     PLATFORMS,
     SOURCE_API_TRACKING,
     SOURCE_INFORMED_DELIVERY,
 )
+from .contents import ContentsStore
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,6 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
         # that poll's 401 decide whether this is an expiry or a revocation.
         await coordinator.async_restore_session()
 
+    await coordinator.contents_store.async_load()
     # Fetch initial data here, before forwarding to platforms. Raising
     # ConfigEntryNotReady from a forwarded platform is too late for HA to catch
     # cleanly (it logs a warning and half-sets-up the entry); doing the first
@@ -119,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> bool
     # triggers this refresh, which recomputes the tier and re-arms scheduling.
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
-    async_setup_services(hass)
+    async_setup_services(hass, hub=entry.data.get(CONF_SOURCE) == SOURCE_API_TRACKING)
 
     return True
 
@@ -144,10 +147,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> boo
     """Unload the USPS config entry."""
     if not await hass.config_entries.async_unload_platforms(entry, _platforms(entry)):
         return False
-    if not any(
-        other.data.get(CONF_SOURCE) == SOURCE_API_TRACKING
-        for other in hass.config_entries.async_entries("usps")
-        if other.entry_id != entry.entry_id
-    ):
-        async_unload_services(hass)
+    # Drop a service when the last entry that needs it goes, so unloading one
+    # entry never breaks the others.
+    others = [
+        other
+        for other in hass.config_entries.async_entries(DOMAIN)
+        if other.entry_id != entry.entry_id and other.state is ConfigEntryState.LOADED
+    ]
+    hubs_left = any(
+        other.data.get(CONF_SOURCE) == SOURCE_API_TRACKING for other in others
+    )
+    async_unload_services(hass, hubs_left=hubs_left, entries_left=bool(others))
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: USPSConfigEntry) -> None:
+    """Delete the entry's stored contents."""
+    await ContentsStore(hass, entry.entry_id).async_remove()

@@ -383,6 +383,7 @@ def normalize_api_tracking_parcel(
         "barcode": tracking_code,
         "sender": None,
         "receiver": None,
+        "contents": None,
         "status": status,
         "raw_status": raw.get("status") or status_code,
         "delivered": delivered,

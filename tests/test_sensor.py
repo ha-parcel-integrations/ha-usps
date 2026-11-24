@@ -45,6 +45,7 @@ def _parcel(
         "barcode": barcode,
         "sender": "Sender",
         "receiver": None,
+        "contents": "Running shoes",
         "status": status,
         "planned_from": planned_from,
         "planned_to": None,
@@ -147,6 +148,7 @@ def test_next_delivery_picks_the_earliest_moment():
     sensor = USPSNextDeliverySensor(coordinator, _entry())
     assert sensor.native_value == datetime(2099, 5, 1, 10, 0, tzinfo=UTC)
     assert sensor.extra_state_attributes["barcode"] == "B"
+    assert sensor.extra_state_attributes["contents"] == "Running shoes"
 
 
 def test_next_delivery_is_none_without_any_moment():

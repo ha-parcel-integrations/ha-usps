@@ -53,3 +53,22 @@ async def test_get_events_narrow_range_returns_only_the_timed_event():
         datetime(2099, 5, 10, 13, 45, tzinfo=UTC),
     )
     assert [e.uid for e in events] == ["TIMED"]
+
+
+def _parcel_cal(parcel: dict) -> USPSDeliveriesCalendar:
+    entry = MagicMock()
+    entry.entry_id = "cfg"
+    coordinator = MagicMock()
+    coordinator.data = [parcel]
+    return USPSDeliveriesCalendar(coordinator, entry)
+
+
+def test_title_prefers_contents_then_sender_then_fallback():
+    base = {"planned_from": "2099-01-01T10:00:00Z", "barcode": "A", "sender": "Shop"}
+    assert _parcel_cal({**base, "contents": "Running shoes"}).event.summary == (
+        "Running shoes"
+    )
+    assert _parcel_cal({**base, "contents": None}).event.summary == "Shop"
+    no_sender = {**base, "contents": None, "sender": None}
+    assert _parcel_cal(no_sender).event.summary == "Parcel A"
+    assert _parcel_cal({**no_sender, "barcode": None}).event.summary == "USPS parcel"

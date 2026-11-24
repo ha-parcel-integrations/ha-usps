@@ -328,3 +328,28 @@ def test_package_times_follow_the_given_zone():
         tz=PACIFIC,
     )
     assert delivered["delivered_at"] == "2026-09-24T14:05:00-07:00"
+
+
+def test_inbox_parcel_keys_put_contents_after_receiver():
+    parcel = normalize_informed_delivery_parcel({"trackingNumber": "9400"})
+    assert list(parcel) == [
+        "carrier",
+        "barcode",
+        "sender",
+        "receiver",
+        "contents",
+        "status",
+        "raw_status",
+        "delivered",
+        "delivered_at",
+        "planned_from",
+        "planned_to",
+        "pickup",
+        "pickup_point",
+        "url",
+        "weight",
+        "dimensions",
+        "history",
+        "raw",
+    ]
+    assert parcel["contents"] is None

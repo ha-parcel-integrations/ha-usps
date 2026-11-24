@@ -37,6 +37,7 @@ from ..const import (
     STAGGER_MINUTES,
     ParcelStatus,
 )
+from ..contents import ContentsStore, normalize_code
 from .client import ApiTrackingClient, USPSApiError, USPSAuthError
 from .parcels import apply_delivered_filter, normalize_parcel, sort_parcels_by_ts
 
@@ -154,6 +155,10 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
             update_interval=timedelta(minutes=HOT_INTERVAL_MINUTES),
         )
         self._client = client
+        self.contents_store = ContentsStore(hass, entry.entry_id)
+        # Every code this entry lists, delivered ones included: update_contents
+        # asks which entry a code belongs to.
+        self.known_codes: frozenset[str] = frozenset()
         self.delivered: list[dict] = []
         # tracking_code -> last successful raw payload, so a transient fetch
         # failure or a not-found blip keeps the parcel visible instead of
@@ -186,6 +191,13 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         self._cached_device_id: str | None = None
         # Timestamp of the last successful poll (diagnostic sensor).
         self.last_success_time: datetime | None = None
+
+    def _apply_contents(self, parcel: dict, code: object) -> dict:
+        """Put the user's own contents text over the carrier's, when there is one."""
+        user_value = self.contents_store.get(code)
+        if user_value is not None:
+            parcel["contents"] = user_value
+        return parcel
 
     @property
     def current_tier_minutes(self) -> int | None:
@@ -340,9 +352,20 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
 
         include_history = self._include_history
         entries = [
-            (code, normalize_parcel(raw, include_history=include_history))
+            (
+                code,
+                self._apply_contents(
+                    normalize_parcel(raw, include_history=include_history), code
+                ),
+            )
             for code, raw in raws_by_code.items()
         ]
+        self.known_codes = frozenset(
+            normalize_code(value)
+            for code, parcel in entries
+            for value in (code, parcel.get("barcode"))
+            if value
+        )
         active = [parcel for _, parcel in entries if not parcel["delivered"]]
         delivered = [parcel for _, parcel in entries if parcel["delivered"]]
         # Rebuilt fresh from this cycle's data — a code whose payload just

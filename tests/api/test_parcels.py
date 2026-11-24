@@ -155,3 +155,28 @@ def test_apply_delivered_filter_by_days_keeps_unparseable():
     )
     parcels = [{"delivered_at": None}]
     assert apply_delivered_filter(parcels, entry) == parcels
+
+
+def test_api_parcel_keys_put_contents_after_receiver():
+    parcel = normalize_api_tracking_parcel({"trackingNumber": "9400"})
+    assert list(parcel) == [
+        "carrier",
+        "barcode",
+        "sender",
+        "receiver",
+        "contents",
+        "status",
+        "raw_status",
+        "delivered",
+        "delivered_at",
+        "planned_from",
+        "planned_to",
+        "pickup",
+        "pickup_point",
+        "url",
+        "weight",
+        "dimensions",
+        "history",
+        "raw",
+    ]
+    assert parcel["contents"] is None

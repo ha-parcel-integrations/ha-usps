@@ -9,6 +9,11 @@ track_parcel:
       example: "EXAMPLE123456"
       selector:
         text:
+    contents:
+      required: false
+      example: "Running shoes"
+      selector:
+        text:
 
 untrack_parcel:
   fields:
@@ -19,5 +24,23 @@ untrack_parcel:
     tracking_code:
       required: true
       example: "EXAMPLE123456"
+      selector:
+        text:
+
+update_contents:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: usps
+    tracking_code:
+      required: true
+      example: "EXAMPLE123456"
+      selector:
+        text:
+    contents:
+      required: false
+      example: "Running shoes"
       selector:
         text:
