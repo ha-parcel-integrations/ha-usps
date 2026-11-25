@@ -7,6 +7,7 @@ import pytest
 from custom_components.usps.api.client import (
     ApiTrackingClient,
     TrackingNotEnabledError,
+    TrackingRefusedError,
     USPSApiError,
     USPSAuthError,
 )
@@ -176,7 +177,7 @@ async def test_token_endpoint_bad_expires_in_defaults_to_zero_lifetime():
     assert session.post.call_count == 2
 
 
-async def test_get_parcel_second_401_gives_up_as_an_auth_error():
+async def test_get_parcel_second_401_is_a_refusal_not_an_auth_error():
     session = MagicMock()
     session.post.return_value = _ctx(
         AsyncMock(
@@ -190,18 +191,42 @@ async def test_get_parcel_second_401_gives_up_as_an_auth_error():
             ),
         )
     )
-    session.get.return_value = _ctx(AsyncMock(status=401))
-    with pytest.raises(USPSAuthError):
+    session.get.return_value = _ctx(
+        AsyncMock(status=401, text=AsyncMock(return_value=""))
+    )
+    with pytest.raises(TrackingRefusedError, match="no reason given") as err:
         await ApiTrackingClient("key", "secret", session).async_get_parcel("9400")
+    assert not isinstance(err.value, USPSAuthError)
 
 
-async def test_get_parcel_403_is_an_auth_error():
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        (
+            '{"error": {"code": "403", "message": "Not entitled for 9400111"}}',
+            "Not entitled for <tracking number>",
+        ),
+        (
+            '{"error": "access_denied", "error_description": "Insufficient scope"}',
+            "Insufficient scope",
+        ),
+        ('{"message": "Forbidden"}', "Forbidden"),
+        ("<html>\n  Access   Denied </html>", "<html> Access Denied </html>"),
+    ],
+)
+async def test_get_parcel_403_is_a_refusal_carrying_usps_reason(body, reason):
     session = _session(
         {"access_token": "token", "expires_in": 3600, "scope": "tracking"}, {}
     )
-    session.get.return_value = _ctx(AsyncMock(status=403))
-    with pytest.raises(USPSAuthError):
-        await ApiTrackingClient("key", "secret", session).async_get_parcel("9400")
+    session.get.return_value = _ctx(
+        AsyncMock(status=403, text=AsyncMock(return_value=body))
+    )
+    with pytest.raises(TrackingRefusedError) as err:
+        await ApiTrackingClient("key", "secret", session).async_get_parcel("9400111")
+    assert not isinstance(err.value, USPSAuthError)
+    assert err.value.status_code == 403
+    assert reason in err.value.detail
+    assert "9400111" not in err.value.detail
 
 
 async def test_get_parcel_404_returns_none():

@@ -38,7 +38,7 @@ from ..const import (
     ParcelStatus,
 )
 from ..contents import ContentsStore, normalize_code
-from .client import ApiTrackingClient, USPSApiError, USPSAuthError
+from .client import ApiTrackingClient, TrackingRefusedError, USPSApiError, USPSAuthError
 from .parcels import apply_delivered_filter, normalize_parcel, sort_parcels_by_ts
 
 _LOGGER = logging.getLogger(__name__)
@@ -290,6 +290,7 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
 
         raws_by_code: dict[str, dict] = {}
         errors = 0
+        refusal: TrackingRefusedError | None = None
         retry_afters: list[float] = []
         saw_429 = False
         for code, result in zip(codes_to_fetch, results, strict=True):
@@ -297,6 +298,8 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
                 if not isinstance(result, (USPSApiError, aiohttp.ClientError)):
                     raise result
                 errors += 1
+                if isinstance(result, TrackingRefusedError):
+                    refusal = result
                 if isinstance(result, USPSApiError) and result.status_code == 429:
                     saw_429 = True
                     if result.retry_after is not None:
@@ -348,6 +351,10 @@ class USPSCoordinator(DataUpdateCoordinator[list[dict]]):
         self._consecutive_429 = 0
 
         if codes_to_fetch and errors == len(codes_to_fetch) and not raws_by_code:
+            if refusal is not None:
+                raise UpdateFailed(
+                    f"USPS refused the tracking request: {refusal.detail}"
+                )
             raise UpdateFailed("USPS unreachable for all tracked parcels")
 
         include_history = self._include_history

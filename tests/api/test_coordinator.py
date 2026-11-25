@@ -6,7 +6,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.usps.api.client import USPSApiError
+from custom_components.usps.api.client import TrackingRefusedError, USPSApiError
 from custom_components.usps.api.coordinator import BACKOFF_BASE_SECONDS, USPSCoordinator
 from custom_components.usps.api.parcels import normalize_api_tracking_parcel
 from custom_components.usps.const import (
@@ -31,6 +31,23 @@ async def test_429_uses_exponential_backoff_when_no_header(hass):
     with pytest.raises(UpdateFailed) as err:
         await coordinator._async_update_data()
     assert err.value.retry_after == BACKOFF_BASE_SECONDS * 2
+
+
+async def test_tracking_refusal_names_usps_reason_instead_of_reauth(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN, options={CONF_PARCELS: [{CONF_TRACKING_CODE: "9400"}]}
+    )
+    client = MagicMock()
+    client.async_get_parcel = AsyncMock(
+        side_effect=TrackingRefusedError(
+            "HTTP 403 from tracking (Insufficient scope)", status_code=403
+        )
+    )
+    coordinator = USPSCoordinator(hass, client, entry)
+    with pytest.raises(
+        UpdateFailed, match="refused the tracking request.*Insufficient scope"
+    ):
+        await coordinator._async_update_data()
 
 
 async def test_delivered_codes_are_skipped_on_subsequent_polls(hass):

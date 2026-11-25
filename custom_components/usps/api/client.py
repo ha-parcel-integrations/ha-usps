@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import json
 import logging
 from typing import Any
 
@@ -36,6 +37,14 @@ class USPSAuthError(USPSApiError):
 
 class TrackingNotEnabledError(USPSAuthError):
     """The credentials work but were not issued the Tracking scope."""
+
+
+class TrackingRefusedError(USPSApiError):
+    """USPS issued a token but refused the tracking request made with it.
+
+    Not a :class:`USPSAuthError`: the token endpoint already accepted the
+    credentials, so asking the user to re-enter them cannot help.
+    """
 
 
 class USPSBlockedError(USPSApiError):
@@ -134,8 +143,10 @@ class ApiTrackingClient:
                     self._access_token = None
                     continue
                 if response.status in (401, 403):
-                    raise USPSAuthError(
-                        f"HTTP {response.status}", status_code=response.status
+                    reason = _refusal_reason(await response.text(), tracking_code)
+                    raise TrackingRefusedError(
+                        f"HTTP {response.status} from tracking ({reason})",
+                        status_code=response.status,
                     )
                 if response.status == 404:
                     return None
@@ -162,4 +173,26 @@ class ApiTrackingClient:
             if not isinstance(payload, dict):
                 raise USPSApiError("unexpected body (not a JSON object)")
             return payload
-        raise USPSAuthError("token refresh failed")
+        raise TrackingRefusedError("tracking refused a fresh token")
+
+
+def _refusal_reason(body: str, tracking_code: str) -> str:
+    """Summarise USPS's error body for the log, without the tracking number."""
+    reason: Any = None
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            reason = error.get("message") or error.get("code")
+        elif isinstance(error, str):
+            reason = payload.get("error_description") or error
+        reason = reason or payload.get("message")
+    text = str(reason) if reason else " ".join(body.split())
+    if not text:
+        return "no reason given"
+    if tracking_code:
+        text = text.replace(tracking_code, "<tracking number>")
+    return text[:200]
